@@ -2,9 +2,11 @@ import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { FileUp, Sparkles, Loader2, AlertTriangle, ShieldX, RotateCcw } from 'lucide-react';
+import { FileUp, Sparkles, Loader2, AlertTriangle, ShieldX, RotateCcw, Stamp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MAX_PDF_BYTES, type InvoiceType, type SourceSystem, type ParsedInvoice } from '@/lib/queries';
+import { scanPdf417 } from '@/lib/pdf417';
+import { parseTED } from '@/lib/ted';
 
 const schema = z
   .object({
@@ -46,6 +48,7 @@ export function InvoiceForm({ onSubmit, onParse, pdfUsed, pdfLimit }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [parsing, setParsing] = useState(false);
   const [aiInfo, setAiInfo] = useState<{ confidence: string; warnings: string[] } | null>(null);
+  const [tedInfo, setTedInfo] = useState<{ label: string; folio: string } | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [rejection, setRejection] = useState<string | null>(null);
   const [source, setSource] = useState<SourceSystem>('MANUAL');
@@ -54,6 +57,7 @@ export function InvoiceForm({ onSubmit, onParse, pdfUsed, pdfLimit }: Props) {
     setRejection(null);
     setParseError(null);
     setAiInfo(null);
+    setTedInfo(null);
   }
 
   const {
@@ -78,15 +82,32 @@ export function InvoiceForm({ onSubmit, onParse, pdfUsed, pdfLimit }: Props) {
       setParseError('El archivo supera los 2MB. Sube solo la factura, no un reporte pesado.');
       return;
     }
-    if (quotaExhausted) {
-      setParseError(`Alcanzaste el límite Beta de ${pdfLimit} lecturas de PDF este mes.`);
-      return;
-    }
     setParseError(null);
     setAiInfo(null);
     setRejection(null);
+    setTedInfo(null);
     setParsing(true);
     try {
+      // 1) Timbre SII (PDF417): local, determinista y SIN costo IA. Se intenta siempre
+      //    —incluso con la cuota IA agotada—, porque no la consume (§D1).
+      const raw = await scanPdf417(file);
+      const ted = raw ? parseTED(raw) : null;
+      if (ted) {
+        setValue('type', ted.invoiceType); // §D2: default AR, el usuario confirma abajo
+        setValue('total_amount', ted.montoTotal);
+        if (ted.razonSocialReceptor) setValue('contact_name', ted.razonSocialReceptor);
+        setValue('issue_date', ted.fechaEmision);
+        setValue('due_date', ted.fechaEmision); // vencimiento = emisión por defecto; ajustable
+        setSource('MANUAL'); // §D1: se guarda como MANUAL (sin tocar BD/función externa)
+        setTedInfo({ label: ted.tipoDteLabel, folio: ted.folio });
+        return; // no consume cuota IA
+      }
+
+      // 2) Sin timbre legible → fallback IA (este sí está limitado por la cuota).
+      if (quotaExhausted) {
+        setParseError(`Sin timbre SII legible y alcanzaste el límite Beta de ${pdfLimit} lecturas IA este mes.`);
+        return;
+      }
       const result = await onParse(file);
       // Escudo anti-basura: cotización/presupuesto → bloqueo duro, no se pre-llena.
       if (!result.is_valid_invoice) {
@@ -122,6 +143,7 @@ export function InvoiceForm({ onSubmit, onParse, pdfUsed, pdfLimit }: Props) {
       reset({ type: values.type, issue_date: today, due_date: today, total_amount: undefined, contact_name: '' });
       setSource('MANUAL');
       setAiInfo(null);
+      setTedInfo(null);
       setRejection(null);
     } catch (e) {
       setError('root', { message: e instanceof Error ? e.message : 'No se pudo crear la factura' });
@@ -133,43 +155,40 @@ export function InvoiceForm({ onSubmit, onParse, pdfUsed, pdfLimit }: Props) {
       <h3 className="mb-1 font-semibold">Nueva factura</h3>
       <p className="mb-4 text-xs text-muted-foreground">Cuentas por cobrar (A/R) o por pagar (A/P)</p>
 
-      {/* Dropzone IA */}
+      {/* Dropzone: timbre SII (local, sin costo) con fallback a IA */}
       <div
-        onClick={() => !parsing && !quotaExhausted && fileRef.current?.click()}
+        onClick={() => !parsing && fileRef.current?.click()}
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           e.preventDefault();
-          if (!parsing && !quotaExhausted) void handleFile(e.dataTransfer.files?.[0]);
+          if (!parsing) void handleFile(e.dataTransfer.files?.[0]);
         }}
-        aria-disabled={quotaExhausted}
-        className={`mb-4 flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed px-4 py-5 text-center transition-colors ${
-          quotaExhausted
-            ? 'cursor-not-allowed border-border bg-muted/30 opacity-60'
-            : 'cursor-pointer border-accent/50 bg-accent/5 hover:border-accent'
-        }`}
+        aria-disabled={parsing}
+        className="mb-4 flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-accent/50 bg-accent/5 px-4 py-5 text-center transition-colors hover:border-accent cursor-pointer"
       >
         <input
           ref={fileRef}
           type="file"
           accept="application/pdf"
           className="hidden"
-          disabled={quotaExhausted}
           onChange={(e) => void handleFile(e.target.files?.[0])}
         />
         {parsing ? (
           <span className="flex items-center gap-2 text-sm text-accent">
             <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            Leyendo documento con IA…
+            Analizando documento…
           </span>
-        ) : quotaExhausted ? (
-          <span className="text-sm text-muted-foreground">Límite Beta de {pdfLimit} PDFs alcanzado este mes.</span>
         ) : (
           <>
             <span className="flex items-center gap-2 text-sm font-medium">
               <FileUp className="size-4 text-accent" aria-hidden="true" />
               Arrastra el PDF de tu factura aquí
             </span>
-            <span className="text-xs text-muted-foreground">o haz clic para subir — la IA pre-llena el formulario</span>
+            <span className="text-xs text-muted-foreground">
+              {quotaExhausted
+                ? 'Cuota IA agotada — aún se leen facturas con timbre SII sin costo'
+                : 'o haz clic para subir — el timbre SII (o la IA) pre-llena el formulario'}
+            </span>
           </>
         )}
       </div>
@@ -195,6 +214,18 @@ export function InvoiceForm({ onSubmit, onParse, pdfUsed, pdfLimit }: Props) {
             <RotateCcw className="size-3.5" aria-hidden="true" />
             Subir otro documento
           </button>
+        </div>
+      )}
+
+      {tedInfo && !rejection && (
+        <div className="mb-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs">
+          <p className="flex items-center gap-1.5 font-medium text-emerald-600 dark:text-emerald-400">
+            <Stamp className="size-3.5" aria-hidden="true" />
+            Leído del Timbre SII · {tedInfo.label} N° {tedInfo.folio} · sin costo IA
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            Datos extraídos del timbre electrónico. Confirma el tipo (A/R o A/P) y el vencimiento antes de guardar.
+          </p>
         </div>
       )}
 

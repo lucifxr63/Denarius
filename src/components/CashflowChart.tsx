@@ -1,4 +1,4 @@
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceDot, CartesianGrid } from 'recharts';
+import { ComposedChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceDot, CartesianGrid } from 'recharts';
 import type { ProjectionPoint, Granularity } from '@/lib/projection';
 import { formatCLP, formatCLPShort } from '@/lib/utils';
 import { useTheme } from '@/store/theme';
@@ -20,20 +20,26 @@ interface Props {
   granularity: Granularity;
   onGranularityChange: (g: Granularity) => void;
   lowest?: { date: string; balance: number } | null;
+  /** Proyección "con licitación(es) simulada(s)" — capa violeta punteada superpuesta. */
+  simulatedData?: ProjectionPoint[] | null;
 }
 
-export function CashflowChart({ data, granularity, onGranularityChange, lowest }: Props) {
+export function CashflowChart({ data, granularity, onGranularityChange, lowest, simulatedData }: Props) {
   // Offset del degradado en el cruce por cero: verde arriba, rojo abajo.
   const max = Math.max(0, ...data.map((d) => d.balance));
   const min = Math.min(0, ...data.map((d) => d.balance));
   const zeroOffset = max - min === 0 ? 0 : max / (max - min);
   const markLowest = lowest && lowest.balance < 0 && data.some((d) => d.date === lowest.date);
 
+  // Misma serie de fechas → se anexa como campo extra para compartir el eje X.
+  const hasSim = !!simulatedData && simulatedData.length === data.length;
+  const chartData = hasSim ? data.map((d, i) => ({ ...d, simBalance: simulatedData![i].balance })) : data;
+
   // Paleta del gráfico según el tema (recharts no consume utilidades de Tailwind).
   const dark = useTheme((s) => s.resolved === 'dark');
   const C = dark
-    ? { pos: '#10b981', neg: '#f43f5e', grid: '#1e293b', axis: '#94a3b8', surface: '#0f172a', bg: '#0b1120' }
-    : { pos: '#059669', neg: '#e11d48', grid: '#e2e8f0', axis: '#64748b', surface: '#ffffff', bg: '#f8fafc' };
+    ? { pos: '#10b981', neg: '#f43f5e', grid: '#1e293b', axis: '#94a3b8', surface: '#0f172a', bg: '#0b1120', sim: '#8b5cf6' }
+    : { pos: '#059669', neg: '#e11d48', grid: '#e2e8f0', axis: '#64748b', surface: '#ffffff', bg: '#f8fafc', sim: '#7c3aed' };
 
   return (
     <div className="rounded-2xl border border-border bg-card/60 p-5 backdrop-blur">
@@ -61,7 +67,7 @@ export function CashflowChart({ data, granularity, onGranularityChange, lowest }
 
       <div className="h-72 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+          <ComposedChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
             <defs>
               <linearGradient id="balFill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset={zeroOffset} stopColor={C.pos} stopOpacity={0.35} />
@@ -90,11 +96,14 @@ export function CashflowChart({ data, granularity, onGranularityChange, lowest }
             <Tooltip
               contentStyle={{ background: C.surface, border: `1px solid ${C.grid}`, borderRadius: 8, fontSize: 12 }}
               labelStyle={{ color: C.axis }}
-              formatter={(v) => [formatCLP(Number(v)), 'Saldo']}
+              formatter={(v, n) => [formatCLP(Number(v)), n === 'simBalance' ? 'Con licitación' : 'Saldo']}
               labelFormatter={(l) => new Date(l + 'T00:00:00').toLocaleDateString('es-CL')}
             />
             <ReferenceLine y={0} stroke={C.neg} strokeDasharray="4 4" />
             <Area type="monotone" dataKey="balance" stroke="url(#balStroke)" strokeWidth={2} fill="url(#balFill)" />
+            {hasSim && (
+              <Line type="monotone" dataKey="simBalance" stroke={C.sim} strokeWidth={2} strokeDasharray="5 5" dot={false} fill="none" />
+            )}
             {markLowest && (
               <ReferenceDot
                 x={lowest!.date}
@@ -106,9 +115,15 @@ export function CashflowChart({ data, granularity, onGranularityChange, lowest }
                 label={{ value: 'mínimo', position: 'bottom', fill: C.neg, fontSize: 10 }}
               />
             )}
-          </AreaChart>
+          </ComposedChart>
         </ResponsiveContainer>
       </div>
+      {hasSim && (
+        <p className="mt-2 flex items-center gap-1.5 text-xs text-accent">
+          <span className="inline-block h-0 w-3 border-t-2 border-dashed border-accent" aria-hidden="true" />
+          Línea punteada: proyección simulando las licitaciones activas
+        </p>
+      )}
       {markLowest && (
         <p className="mt-2 text-xs text-danger">
           ⚠ Tu saldo proyectado cae a {formatCLP(lowest!.balance)} el {lowest!.date}.

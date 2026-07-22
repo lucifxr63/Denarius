@@ -79,11 +79,23 @@ export function phantomEvents(
   return events;
 }
 
+// Oportunidad de venta pública (licitación/Compra Ágil) que el usuario simula en
+// la proyección para ver el impacto de adjudicársela. No persiste en BD (Fase 3
+// del plan Luca→Denarius: alta manual, cliente-side vía useBidsStore).
+export interface SimulatedBid {
+  id: string;
+  amount: number; // monto esperado del contrato
+  payDate: string; // fecha estimada de pago estatal (YYYY-MM-DD)
+  probability: number; // 0–100
+}
+
 /**
  * Serie diaria de "Saldo Disponible Real" desde hoy hasta hoy+horizonDays.
  * Reserva de impuestos: si taxRate>0, cada ingreso proyectado (A/R o IN) entra
  * neto del impuesto (amount*(1-taxRate/100)); el % reservado queda fuera del
  * disponible (ver restrictedTax para el monto retenido).
+ * `bids`: eventos de simulación de licitaciones (§3.1) — ponderados por
+ * probabilidad, con la misma reserva de impuesto que un A/R real.
  */
 export function buildDailyProjection(
   currentCash: number,
@@ -92,6 +104,7 @@ export function buildDailyProjection(
   horizonDays: number,
   recurringTxs: RecurringTransaction[] = [],
   taxRate = 0,
+  bids: SimulatedBid[] = [],
 ): ProjectionPoint[] {
   const deltas = new Array<number>(horizonDays + 1).fill(0);
   const inFactor = 1 - Math.max(0, Math.min(100, taxRate)) / 100;
@@ -115,6 +128,14 @@ export function buildDailyProjection(
     deltas[ev.idx] += ev.type === 'IN' ? ev.amount * inFactor : -ev.amount;
   }
 
+  // Licitaciones simuladas: ingreso ponderado por probabilidad en su fecha de pago.
+  for (const bid of bids) {
+    const idx = dayIndex(today, toDate(bid.payDate));
+    if (idx < 0 || idx > horizonDays) continue;
+    const weight = Math.max(0, Math.min(100, bid.probability)) / 100;
+    deltas[idx] += bid.amount * weight * inFactor;
+  }
+
   const points: ProjectionPoint[] = [];
   let bal = currentCash;
   for (let i = 0; i <= horizonDays; i++) {
@@ -122,6 +143,22 @@ export function buildDailyProjection(
     points.push({ date: isoDate(addDays(today, i)), balance: Math.round(bal) });
   }
   return points;
+}
+
+/**
+ * Mínimo saldo proyectado entre hoy y `untilDate` (inclusive). Se usa para
+ * alertar capital de trabajo: si la caja BASE (sin contar el pago de una
+ * licitación) ya cae bajo cero antes de su fecha de pago estimada, adjudicarse
+ * el contrato no evita el déficit — hay que financiar la ejecución mientras
+ * llega el pago estatal (§3.2 del plan).
+ */
+export function minBalanceUntil(points: ProjectionPoint[], untilDate: string): ProjectionPoint | null {
+  let min: ProjectionPoint | null = null;
+  for (const p of points) {
+    if (p.date > untilDate) continue;
+    if (!min || p.balance < min.balance) min = p;
+  }
+  return min;
 }
 
 /**
