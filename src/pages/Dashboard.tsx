@@ -9,6 +9,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { WorkspaceSwitcher } from '@/components/layout/WorkspaceSwitcher';
 import { CashflowChart } from '@/components/CashflowChart';
 import { BidsPanel } from '@/components/BidsPanel';
+import { ChileCompraPanel } from '@/components/ChileCompraPanel';
 import { InvoiceForm } from '@/components/InvoiceForm';
 import { MovementForm } from '@/components/MovementForm';
 import { ResolutionCenter } from '@/components/ResolutionCenter';
@@ -252,6 +253,10 @@ export function Dashboard() {
             <div className="mt-8 grid gap-6 lg:grid-cols-2">
               <RecurringPanel items={cf.recurringTransactions} onAdd={addRecurring} onRemove={removeRecurring} ignoredIds={ignored} onToggleIgnore={toggleIgnore} />
               <BidsPanel items={bids} onAdd={addBid} onRemove={removeBid} onToggleActive={toggleBid} />
+            </div>
+
+            <div className="mt-8">
+              <ChileCompraPanel onSimulate={addBid} />
             </div>
 
             <div className="mt-8 grid gap-6 lg:grid-cols-2">
