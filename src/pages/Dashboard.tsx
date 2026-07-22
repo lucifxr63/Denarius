@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Wallet, LogOut, TrendingDown, Timer, Flame, Settings, RotateCcw, HelpCircle, LayoutGrid } from 'lucide-react';
+import { Wallet, LogOut, TrendingDown, Timer, Flame, Settings, RotateCcw, HelpCircle, LayoutGrid, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Kpi } from '@/components/Kpi';
 import { RestrictedCashKpi } from '@/components/RestrictedCashKpi';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { WorkspaceSwitcher } from '@/components/layout/WorkspaceSwitcher';
 import { CashflowChart } from '@/components/CashflowChart';
+import { BidsPanel } from '@/components/BidsPanel';
 import { InvoiceForm } from '@/components/InvoiceForm';
 import { MovementForm } from '@/components/MovementForm';
 import { ResolutionCenter } from '@/components/ResolutionCenter';
@@ -28,9 +29,11 @@ import {
   computeKpis,
   overdueReceivables,
   restrictedTax,
+  minBalanceUntil,
   HORIZON_DAYS,
   type Granularity,
 } from '@/lib/projection';
+import { useBidsStore } from '@/store/useBidsStore';
 
 export function Dashboard() {
   const { user } = useAuth();
@@ -65,6 +68,36 @@ export function Dashboard() {
     [cf.currentCash, visInvoices, today, granularity, visRecurring, taxRate],
   );
   const chartData = useMemo(() => aggregate(daily, granularity), [daily, granularity]);
+
+  // Fase 3: licitaciones simuladas (client-side). La curva "con licitación" solo
+  // se calcula/grafica si hay al menos una oportunidad activa.
+  const bids = useBidsStore((s) => s.bids);
+  const addBid = useBidsStore((s) => s.addBid);
+  const removeBid = useBidsStore((s) => s.removeBid);
+  const toggleBid = useBidsStore((s) => s.toggleActive);
+  const activeBids = useMemo(
+    () => bids.filter((b) => b.active).map((b) => ({ id: b.id, amount: b.amount, payDate: b.payDate, probability: b.probability })),
+    [bids],
+  );
+  const simDaily = useMemo(
+    () =>
+      activeBids.length === 0
+        ? null
+        : buildDailyProjection(cf.currentCash, visInvoices, today, HORIZON_DAYS[granularity], visRecurring, taxRate, activeBids),
+    [activeBids, cf.currentCash, visInvoices, today, granularity, visRecurring, taxRate],
+  );
+  const simChartData = useMemo(() => (simDaily ? aggregate(simDaily, granularity) : null), [simDaily, granularity]);
+
+  // Alerta de capital de trabajo (§3.2): si la caja BASE (sin el pago del contrato)
+  // cae bajo cero antes de la fecha de pago de alguna licitación activa, hay que
+  // financiar la ejecución mientras llega el pago estatal.
+  const workingCapitalAlert = useMemo(() => {
+    if (activeBids.length === 0) return null;
+    const latestPay = activeBids.reduce((m, b) => (b.payDate > m ? b.payDate : m), activeBids[0].payDate);
+    const valley = minBalanceUntil(daily, latestPay);
+    if (valley && valley.balance < 0) return valley;
+    return null;
+  }, [activeBids, daily]);
   const kpis = useMemo(
     () => computeKpis(cf.currentCash, cf.transactions, daily, today, visRecurring, taxRate),
     [cf.currentCash, cf.transactions, daily, today, visRecurring, taxRate],
@@ -193,6 +226,7 @@ export function Dashboard() {
                 granularity={granularity}
                 onGranularityChange={setGranularity}
                 lowest={kpis.lowestDate ? { date: kpis.lowestDate, balance: kpis.lowestBalance } : null}
+                simulatedData={simChartData}
               />
               <AccountsCard accounts={cf.accounts} onAdd={cf.addAccount} onEdit={cf.editAccount} onRemove={cf.removeAccount} />
             </div>
@@ -203,8 +237,21 @@ export function Dashboard() {
               </div>
             )}
 
-            <div className="mt-8">
+            {workingCapitalAlert && (
+              <div className="mt-8 rounded-lg border border-accent/50 bg-accent/10 px-4 py-3 text-sm">
+                <p className="flex items-start gap-2 text-accent">
+                  <Target className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                  <span>
+                    <strong>Capital de trabajo:</strong> adjudicarte estas licitaciones requiere financiar la ejecución antes del pago estatal —
+                    tu caja proyectada cae a <strong>{formatCLP(workingCapitalAlert.balance)}</strong> el {workingCapitalAlert.date}, antes de recibir el ingreso.
+                  </span>
+                </p>
+              </div>
+            )}
+
+            <div className="mt-8 grid gap-6 lg:grid-cols-2">
               <RecurringPanel items={cf.recurringTransactions} onAdd={addRecurring} onRemove={removeRecurring} ignoredIds={ignored} onToggleIgnore={toggleIgnore} />
+              <BidsPanel items={bids} onAdd={addBid} onRemove={removeBid} onToggleActive={toggleBid} />
             </div>
 
             <div className="mt-8 grid gap-6 lg:grid-cols-2">
