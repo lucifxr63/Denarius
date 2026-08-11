@@ -9,3 +9,6 @@ dist-ssr
 .vite
 
 .vercel
+.env*
+supabase/.temp/
+graphify-out/

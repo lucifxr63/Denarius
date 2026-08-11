@@ -1,0 +1,6 @@
+import test from 'node:test';import assert from'node:assert/strict';import fs from'node:fs';
+const q=fs.readFileSync('src/lib/queries.ts','utf8'),sql=fs.readFileSync('supabase/migrations/20260810160000_den118_active_tenant.sql','utf8'),ui=fs.readFileSync('src/components/layout/CompanySwitcher.tsx','utf8');
+test('active tenant preference is Denarius-scoped and ownership checked',()=>{assert.match(sql,/cashflow\.denarius_user_preference/);assert.match(sql,/id=p_tenant_id and owner_id=v_owner/);assert.doesNotMatch(sql,/alter table (public\.)?profiles/i)});
+test('financial collections require an explicit tenant',()=>{assert.match(q,/listAccounts\(tenantId: string\)/);assert.match(q,/listInvoices\(tenantId: string\)/);assert.match(q,/listRecurringTransactions\(tenantId: string\)/);assert.match(q,/\.eq\('tenant_id', tenantId\)/)});
+test('transactions are constrained through tenant bank accounts',()=>{assert.match(q,/listTransactions\(tenantId: string\)/);assert.match(q,/\.in\('account_id', accounts\.map/)});
+test('company switch reloads all tenant-bound state',()=>{assert.match(ui,/setActiveDenariusTenant/);assert.match(ui,/window\.location\.assign\('\/dashboard'\)/);assert.match(ui,/companies\.length<2/)});

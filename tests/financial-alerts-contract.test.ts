@@ -1,0 +1,5 @@
+import assert from 'node:assert/strict';import fs from 'node:fs';import test from 'node:test';
+const sql=fs.readFileSync('supabase/migrations/20260807140000_den105_financial_alert_center.sql','utf8');const page=fs.readFileSync('src/pages/FinancialAlerts.tsx','utf8');
+test('DEN-105 aísla tenant y no persiste datos derivados',()=>{assert.match(sql,/owner_id=v_uid/);assert.match(sql,/auth\.uid\(\)/);assert.match(sql,/security invoker/);assert.doesNotMatch(sql,/insert into|update cashflow|delete from|drop table|truncate/i)});
+test('prioriza caja, runway, cobros, impuestos y señales SaaS',()=>{for(const signal of ['negative-cash','low-runway','overdue-receivables','tax-reserve','customer-concentration','overdue-renewals'])assert.match(sql,new RegExp(signal));assert.match(sql,/when v_runway<3 then 'CRITICAL'/);assert.match(sql,/v_max_days>=30/)});
+test('payload no expone nombres y la interfaz ofrece acciones profundas',()=>{assert.doesNotMatch(sql,/contact_name|'customer',name/);assert.match(sql,/deep_link/);assert.match(page,/alert\.deep_link/);assert.match(page,/No se incluyen nombres ni datos personales/)});

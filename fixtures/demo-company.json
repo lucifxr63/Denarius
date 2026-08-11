@@ -1,0 +1,40 @@
+{
+  "as_of": "2026-08-06",
+  "tenant": {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "name": "Servicios Demo SpA",
+    "business_model": "pyme-tradicional",
+    "default_tax_rate": 19,
+    "ppm_rate": 0.0125,
+    "currency": "CLP"
+  },
+  "accounts": [
+    {
+      "id": "00000000-0000-4000-8000-000000000101",
+      "name": "Cuenta corriente demo",
+      "currency": "CLP",
+      "current_balance": 12400000
+    }
+  ],
+  "transactions": [
+    { "id": "00000000-0000-4000-8000-000000000201", "account_id": "00000000-0000-4000-8000-000000000101", "type": "IN", "amount": 4200000, "category": "Ventas", "transaction_date": "2026-07-15" },
+    { "id": "00000000-0000-4000-8000-000000000202", "account_id": "00000000-0000-4000-8000-000000000101", "type": "OUT", "amount": 3100000, "category": "Nómina", "transaction_date": "2026-07-30" },
+    { "id": "00000000-0000-4000-8000-000000000203", "account_id": "00000000-0000-4000-8000-000000000101", "type": "OUT", "amount": 850000, "category": "Operación", "transaction_date": "2026-08-01" }
+  ],
+  "invoices": [
+    { "id": "00000000-0000-4000-8000-000000000301", "type": "AR", "status": "PENDING", "total_amount": 3600000, "currency": "CLP", "contact_name": "Cliente Norte Demo", "issue_date": "2026-07-20", "due_date": "2026-08-12" },
+    { "id": "00000000-0000-4000-8000-000000000302", "type": "AR", "status": "PENDING", "total_amount": 1400000, "currency": "CLP", "contact_name": "Cliente Sur Demo", "issue_date": "2026-06-20", "due_date": "2026-07-20" },
+    { "id": "00000000-0000-4000-8000-000000000303", "type": "AP", "status": "PENDING", "total_amount": 2200000, "currency": "CLP", "contact_name": "Proveedor Demo", "issue_date": "2026-07-28", "due_date": "2026-08-09" }
+  ],
+  "recurring": [
+    { "id": "00000000-0000-4000-8000-000000000401", "name": "Nómina", "type": "OUT", "amount": 3100000, "currency": "CLP", "frequency": "MONTHLY", "next_date": "2026-08-30" },
+    { "id": "00000000-0000-4000-8000-000000000402", "name": "Arriendo", "type": "OUT", "amount": 900000, "currency": "CLP", "frequency": "MONTHLY", "next_date": "2026-08-05" },
+    { "id": "00000000-0000-4000-8000-000000000403", "name": "Iguala mensual", "type": "IN", "amount": 1200000, "currency": "CLP", "frequency": "MONTHLY", "next_date": "2026-08-15" }
+  ],
+  "expected": {
+    "current_cash": 12400000,
+    "overdue_receivables": 1400000,
+    "pending_receivables": 5000000,
+    "pending_payables": 2200000
+  }
+}

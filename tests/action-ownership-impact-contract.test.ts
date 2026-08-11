@@ -1,0 +1,4 @@
+import assert from'node:assert/strict';import fs from'node:fs';import test from'node:test';const sql=fs.readFileSync('supabase/migrations/20260810140000_den116_action_ownership_impact.sql','utf8'),page=fs.readFileSync('src/pages/ActionPlan.tsx','utf8');
+test('solo el propietario actualiza acciones semanales',()=>{assert.match(sql,/owner_id=v_uid and source='WEEKLY_CLOSE'/);assert.match(sql,/action_not_found/)});
+test('responsable fecha e impacto se validan y auditan',()=>{assert.match(sql,/invalid_assignee/);assert.match(sql,/due_date_required/);assert.match(sql,/invalid_cash_impact/);assert.match(sql,/msp_task_activity/)});
+test('la interfaz declara que el impacto no es calculado',()=>{assert.match(page,/estimación declarada, no un resultado calculado/);assert.match(page,/Responsable/);assert.match(page,/Fecha límite/);assert.match(page,/\+ mejora \/ − reduce/)});

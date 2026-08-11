@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GoogleIcon } from '@/components/GoogleIcon';
@@ -9,17 +9,20 @@ import { useAuth } from '@/store/auth';
 
 export function Login() {
   const { session, loading: authLoading } = useAuth();
+  const [searchParams] = useSearchParams();
+  const requestedReturn = searchParams.get('returnTo');
+  const returnTo = requestedReturn?.startsWith('/') && !requestedReturn.startsWith('//') ? requestedReturn : '/dashboard';
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Si ya hay sesión, no mostramos el login.
-  if (!authLoading && session) return <Navigate to="/dashboard" replace />;
+  if (!authLoading && session) return <Navigate to={returnTo} replace />;
 
   async function handleGoogle() {
     setError(null);
     setSubmitting(true);
     try {
-      await signInWithGoogle(); // redirige el navegador a Google
+      await signInWithGoogle(returnTo); // redirige el navegador a Google
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo iniciar sesión. Intenta de nuevo.');
       setSubmitting(false);
@@ -38,9 +41,9 @@ export function Login() {
           <div className="mb-4 grid size-12 place-items-center rounded-xl bg-primary/15 text-primary">
             <Wallet className="size-6" aria-hidden="true" />
           </div>
-          <h1 className="font-display text-2xl font-bold">Entra a Denarius</h1>
+          <h1 className="font-display text-2xl font-bold">Crea tu cuenta o entra</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Gestiona el flujo de caja de tu negocio en un solo lugar.
+            Google verifica tu identidad. Luego configuraremos tu empresa y primera proyección.
           </p>
         </div>
 
@@ -63,7 +66,7 @@ export function Login() {
         )}
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
-          Al continuar aceptas nuestros Términos y Política de Privacidad.
+          Usaremos tu nombre, correo e imagen de Google para identificar tu acceso. No publicamos información financiera.
         </p>
       </div>
     </main>

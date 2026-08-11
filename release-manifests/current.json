@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "releaseId": "2026-08-11-denarius-beta-rc1",
+  "productionUrl": "https://denarius.scouttech.lat",
+  "frontend": {
+    "current": "https://cashflow-oiojr9q2f-lucifxr63s-projects.vercel.app",
+    "rollbackTarget": "https://cashflow-eisg6tizh-lucifxr63s-projects.vercel.app"
+  },
+  "edgeFunctions": [
+    "denarius-tools",
+    "denarius-mcp",
+    "denarius-mcp-metadata"
+  ],
+  "edgeFunctionArtifact": "release-artifacts/2026-08-07-ops103-104",
+  "supabaseProjectRef": "fcdhcntyvsydnvjwopfe",
+  "edgeFunctionHashes": {
+    "denarius-tools": "07c6c621b0780da5488ccf56ea903ceaaa855d58f1d9859a2153c779f8b543c5",
+    "denarius-mcp": "da0e2174fbf8f7644b780ae2a4bb5c3e20bd4c8284f8fa6bbf4dccd3f7ea28d6",
+    "denarius-mcp-metadata": "6489bad25a89e1efc9a3332c76f03b46c45732f4559f927e47b0348b095efdec"
+  },
+  "database": {
+    "strategy": "forward-fix",
+    "sharedProducts": ["Denarius", "Validus", "Licitus", "Animus"],
+    "destructiveRollbackAllowed": false
+  },
+  "certification": {
+    "local": ["npm run validate:platform", "npm run check"],
+    "remote": ["npm run certify:beta-go-no-go"]
+  }
+}

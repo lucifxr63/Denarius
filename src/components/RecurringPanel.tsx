@@ -20,12 +20,13 @@ interface Props {
   onRemove: (id: string) => Promise<void>;
   ignoredIds?: Set<string>;
   onToggleIgnore?: (id: string) => void;
+  canManage?: boolean;
 }
 
 const inputCls =
   'h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition-colors focus:border-primary/60';
 
-export function RecurringPanel({ items, onAdd, onRemove, ignoredIds, onToggleIgnore }: Props) {
+export function RecurringPanel({ items, onAdd, onRemove, ignoredIds, onToggleIgnore, canManage=true }: Props) {
   const confirm = useConfirm();
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<TxType>('OUT');
@@ -103,13 +104,13 @@ export function RecurringPanel({ items, onAdd, onRemove, ignoredIds, onToggleIgn
                     {hidden ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
                   </button>
                 )}
-                <button
+                {canManage && <button
                   onClick={() => remove(x)}
                   className="grid size-7 place-items-center rounded-md text-muted-foreground opacity-0 transition-all hover:bg-muted hover:text-danger group-hover:opacity-100 cursor-pointer"
                   aria-label={`Eliminar ${x.name}`}
                 >
                   <Trash2 className="size-4" aria-hidden="true" />
-                </button>
+                </button>}
               </span>
             </li>
             );
@@ -126,17 +127,17 @@ export function RecurringPanel({ items, onAdd, onRemove, ignoredIds, onToggleIgn
           <Repeat className="size-5 text-accent" aria-hidden="true" />
           <h3 className="font-semibold">Piloto Automático (Fijos)</h3>
         </div>
-        <Button size="sm" variant="ghost" onClick={() => setOpen((v) => !v)}>
+        {canManage&&<Button size="sm" variant="ghost" onClick={() => setOpen((v) => !v)}>
           <Plus className="size-4" aria-hidden="true" />
           Nuevo fijo
-        </Button>
+        </Button>}
       </div>
       <p className="mb-4 text-xs text-muted-foreground">
         Reglas de proyección (no ensucian la BD). Neto mensual fijo:{' '}
         <span className={`font-semibold ${net >= 0 ? 'text-primary' : 'text-danger'}`}>{net >= 0 ? '+' : ''}{formatCLP(net)}</span>
       </p>
 
-      {open && (
+      {canManage && open && (
         <form onSubmit={submit} className="mb-4 space-y-3 rounded-lg border border-border bg-background/40 p-4">
           <div className="flex rounded-lg border border-border p-0.5 text-sm">
             <button type="button" onClick={() => setType('IN')} className={`flex-1 rounded-md py-1.5 font-medium transition-colors cursor-pointer ${type === 'IN' ? 'bg-primary/15 text-primary' : 'text-muted-foreground'}`}>

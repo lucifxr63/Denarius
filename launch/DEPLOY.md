@@ -1,5 +1,30 @@
 # Go-Live Cashflow — Runbook de despliegue (CASHFLOW_PRD_PART_5)
 
+## Estado vigente — 2026-08-06
+
+- Proyecto Vercel: `lucifxr63s-projects/cashflow`.
+- Dominio productivo: `https://denarius.scouttech.lat`.
+- Root actual: repositorio Denarius (`package.json` y `vercel.json` en raíz).
+- Build: `npm run build`; salida: `dist`.
+- El release certificado del copiloto E07 fue desplegado como
+  `dpl_FpoNS9qgamkCcdHZraWwYGg4tASe` y quedó `READY`.
+- Las funciones `denarius-tools` y `denarius-mcp` quedaron publicadas; MCP expone y certifica las 9 herramientas mediante JSON-RPC,
+  aislamiento por tenant, auditoría y simulaciones sin persistencia.
+- La validación autenticada confirmó que dashboard y copiloto coinciden en burn
+  (`$95.111/mes`) y runway (`0,6 meses`) para el dataset productivo verificado.
+- E08 quedó desplegado como `dpl_AHDn6ciPqFDbkT8VyY364ea5Qu63` (`READY`).
+- `/dashboard` es ahora la vista adaptativa por modelo y `/operations` conserva
+  el flujo operativo completo.
+- El diagnóstico de seis preguntas, la recomendación explicable y la persistencia
+  en `tenant.business_model` fueron validados con una sesión autenticada.
+- El primer corte E09 fue desplegado como `dpl_J5iZxYfpXPiyhD8TMgqvuuhwTpxE` (`READY`).
+- `financial_core_metrics` es la fuente común de burn, runway y caja para
+  `metrics_saas`, `denarius-tools` y `denarius-mcp`.
+- La prueba remota comparó los valores de las tres superficies y confirmó igualdad;
+  la empresa demo muestra burn `$95.111` y runway `0,6 meses`.
+- La sección histórica que menciona `cashflow.scouttech.lat` y el monorepo
+  `startups/cashflow` ya no describe la configuración vigente.
+
 ## ✅ Ya ejecutado por el agente (verificado)
 - **`vercel.json`** creado con rewrite SPA (`/(.*) → /index.html`) — sin esto, `/auth/callback` daría 404 en Vercel.
 - **Supabase Redirect URLs** (allowlist) ahora incluye:

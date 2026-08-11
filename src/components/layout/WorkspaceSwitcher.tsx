@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Building2, Rocket, ChevronsUpDown, Check } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getDefaultTenant, getDenariusAccessContext, saveBusinessModelProfile } from '@/lib/queries';
+import { toast } from 'sonner';
 import { useWorkspaceStore, WORKSPACES, getWorkspaceMeta, type WorkspaceMeta } from '@/store/useWorkspaceStore';
 
 // Workspace Switcher. Conmuta el modelo de negocio activo SIN modales: usa un
@@ -20,10 +22,14 @@ export function WorkspaceSwitcher({ className }: { className?: string }) {
   const model = useWorkspaceStore((s) => s.model);
   const setModel = useWorkspaceStore((s) => s.setModel);
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [canChange, setCanChange] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   const active = getWorkspaceMeta(model);
   const ActiveIcon = ICONS[active.icon];
+
+  useEffect(()=>{void getDefaultTenant().then(async tenant=>{if(tenant)setCanChange((await getDenariusAccessContext(tenant.id)).can_change_business_model)}).catch(()=>setCanChange(false))},[]);
 
   // Cierra al hacer click fuera o con Escape.
   useEffect(() => {
@@ -42,10 +48,25 @@ export function WorkspaceSwitcher({ className }: { className?: string }) {
     };
   }, [open]);
 
-  const select = (next: WorkspaceMeta['id']) => {
-    setModel(next);
-    setOpen(false);
+  const select = async (next: WorkspaceMeta['id']) => {
+    if (next === model) return setOpen(false);
+    setSaving(true);
+    try {
+      const tenant = await getDefaultTenant();
+      if (!tenant) throw new Error('No hay una empresa activa.');
+      await saveBusinessModelProfile({ tenantId: tenant.id, model: next, source: 'manual' });
+      setModel(next);
+      setOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo cambiar la vista.');
+    } finally {
+      setSaving(false);
+    }
   };
+
+  // La comprobación de permisos es asíncrona. Este retorno debe ocurrir después
+  // de todos los hooks para conservar su orden cuando canChange pasa a true.
+  if (!canChange) return <div className={cn('inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-3 text-sm font-medium', className)} title="El modelo pertenece a esta empresa"><ActiveIcon className="size-4 text-primary" aria-hidden="true" /><span className="hidden sm:inline">{active.label}</span><span className="sr-only">Modelo de empresa bloqueado</span></div>;
 
   return (
     <div ref={rootRef} className={cn('relative', className)}>
@@ -55,7 +76,8 @@ export function WorkspaceSwitcher({ className }: { className?: string }) {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Cambiar modelo de negocio"
-        className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-transparent px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted cursor-pointer"
+        disabled={saving}
+        className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-transparent px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 cursor-pointer"
       >
         <span className="grid size-5 place-items-center rounded text-primary">
           <ActiveIcon className="size-4" aria-hidden="true" />
@@ -79,7 +101,8 @@ export function WorkspaceSwitcher({ className }: { className?: string }) {
                 type="button"
                 role="menuitemradio"
                 aria-checked={selected}
-                onClick={() => select(ws.id)}
+                disabled={saving}
+                onClick={() => void select(ws.id)}
                 className={cn(
                   'flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors cursor-pointer',
                   selected ? 'bg-primary/10' : 'hover:bg-muted',

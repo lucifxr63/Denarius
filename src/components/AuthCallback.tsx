@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/store/auth';
+import { ensureDenariusTenant } from '@/lib/queries';
 
 // Página a la que Google redirige tras el login (/auth/callback).
 // supabase-js (detectSessionInUrl: true) intercambia el ?code= automáticamente,
@@ -12,7 +13,15 @@ export function AuthCallback() {
 
   useEffect(() => {
     if (!loading) {
-      navigate(session ? '/dashboard' : '/login', { replace: true });
+      let cancelled=false;
+      void (async()=>{
+      const returnTo = sessionStorage.getItem('denarius_auth_return_to');
+      sessionStorage.removeItem('denarius_auth_return_to');
+      const safeReturnTo = returnTo?.startsWith('/') && !returnTo.startsWith('//') ? returnTo : '/dashboard';
+      if(session){try{await ensureDenariusTenant()}catch{if(!cancelled)navigate('/login?error=account_setup',{replace:true});return}}
+      if(!cancelled)navigate(session ? safeReturnTo : '/login', { replace: true });
+      })();
+      return()=>{cancelled=true};
     }
   }, [session, loading, navigate]);
 

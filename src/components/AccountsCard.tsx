@@ -11,13 +11,14 @@ interface Props {
   onAdd: (name: string, opening: number, currency: string) => Promise<void>;
   onEdit: (id: string, patch: { name?: string; currency?: string; current_balance?: number }) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
+  canManage?: boolean;
 }
 
 const inputCls =
   'h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition-colors focus:border-primary/60';
 const CURRENCIES = ['CLP', 'USD', 'EUR'];
 
-export function AccountsCard({ accounts, onAdd, onEdit, onRemove }: Props) {
+export function AccountsCard({ accounts, onAdd, onEdit, onRemove, canManage=true }: Props) {
   const confirm = useConfirm();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
@@ -61,9 +62,9 @@ export function AccountsCard({ accounts, onAdd, onEdit, onRemove }: Props) {
         <h3 className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
           <Landmark className="size-4" aria-hidden="true" /> Cuentas
         </h3>
-        <Button size="sm" variant="ghost" onClick={() => setOpen((v) => !v)}>
+        {canManage&&<Button size="sm" variant="ghost" onClick={() => setOpen((v) => !v)}>
           <Plus className="size-4" aria-hidden="true" /> Añadir
-        </Button>
+        </Button>}
       </div>
 
       <ul className="space-y-1.5">
@@ -75,12 +76,12 @@ export function AccountsCard({ accounts, onAdd, onEdit, onRemove }: Props) {
               <span className="min-w-0 truncate">{a.name} <span className="text-xs text-muted-foreground">{a.currency}</span></span>
               <span className="flex items-center gap-1.5">
                 <span className={`font-medium ${Number(a.current_balance) < 0 ? 'text-danger' : ''}`}>{formatCLP(Number(a.current_balance))}</span>
-                <button onClick={() => setEditId(a.id)} className="grid size-7 place-items-center rounded-md text-muted-foreground opacity-0 transition-all hover:bg-muted hover:text-foreground group-hover:opacity-100 cursor-pointer" aria-label={`Editar ${a.name}`}>
+                {canManage && <button onClick={() => setEditId(a.id)} className="grid size-7 place-items-center rounded-md text-muted-foreground opacity-0 transition-all hover:bg-muted hover:text-foreground group-hover:opacity-100 cursor-pointer" aria-label={`Editar ${a.name}`}>
                   <Pencil className="size-3.5" aria-hidden="true" />
-                </button>
-                <button onClick={() => remove(a)} className="grid size-7 place-items-center rounded-md text-muted-foreground opacity-0 transition-all hover:bg-muted hover:text-danger group-hover:opacity-100 cursor-pointer" aria-label={`Eliminar ${a.name}`}>
+                </button>}
+                {canManage && <button onClick={() => remove(a)} className="grid size-7 place-items-center rounded-md text-muted-foreground opacity-0 transition-all hover:bg-muted hover:text-danger group-hover:opacity-100 cursor-pointer" aria-label={`Eliminar ${a.name}`}>
                   <Trash2 className="size-3.5" aria-hidden="true" />
-                </button>
+                </button>}
               </span>
             </li>
           ),
@@ -93,7 +94,7 @@ export function AccountsCard({ accounts, onAdd, onEdit, onRemove }: Props) {
         </p>
       )}
 
-      {open && (
+      {canManage && open && (
         <form onSubmit={submitNew} className="mt-3 space-y-2 rounded-lg border border-border bg-background/40 p-3">
           <input className={inputCls} placeholder="Nombre (ej: Banco Estado)" value={name} onChange={(e) => setName(e.target.value)} aria-label="Nombre de la cuenta" />
           <div className="grid grid-cols-2 gap-2">

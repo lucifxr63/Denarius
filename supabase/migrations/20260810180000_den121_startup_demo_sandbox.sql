@@ -1,0 +1,21 @@
+-- DEN-121: segundo sandbox por modelo, con fuentes SaaS canónicas.
+drop index if exists cashflow.denarius_one_demo_per_owner;
+create unique index if not exists denarius_one_demo_per_owner_model on cashflow.tenant(owner_id,business_model) where is_demo;
+create or replace function cashflow.reset_denarius_demo_startup() returns cashflow.tenant language plpgsql security definer set search_path=cashflow,public,pg_temp as $$
+declare v_uid uuid:=auth.uid();v_tenant cashflow.tenant;v_account uuid;v_close uuid;v_today date:=current_date;
+begin
+ if v_uid is null then raise exception 'AUTH_REQUIRED';end if;if coalesce(auth.jwt()->'app_metadata'->>'denarius_role','')<>'platform_admin'then raise exception'ADMIN_REQUIRED';end if;
+ delete from cashflow.tenant where owner_id=v_uid and is_demo=true and business_model='startup-saas';
+ insert into cashflow.tenant(owner_id,name,business_model,business_model_source,business_model_diagnosed_at,business_profile,default_tax_rate,ppm_rate,country_code,base_currency,timezone,company_context_completed_at,financial_onboarding_completed_at,terms_accepted_at,privacy_accepted_at,legal_version,is_demo)
+ values(v_uid,'Nébula SaaS · Demo','startup-saas','manual',now(),'{}',19,0.0125,'CL','CLP','America/Santiago',now(),now(),now(),now(),'2026-08-10',true)returning*into v_tenant;
+ insert into cashflow.bank_account(tenant_id,owner_id,name,currency,current_balance)values(v_tenant.id,v_uid,'Cuenta startup demo','CLP',0)returning id into v_account;
+ insert into cashflow.transaction(account_id,owner_id,type,amount,category,transaction_date)values(v_account,v_uid,'IN',12800000,'Cobros SaaS',v_today-25),(v_account,v_uid,'IN',13100000,'Cobros SaaS',v_today-10),(v_account,v_uid,'OUT',9200000,'Equipo',v_today-8),(v_account,v_uid,'OUT',4100000,'Infraestructura y operación',v_today-4);
+ update cashflow.bank_account set current_balance=84300000 where id=v_account;
+ insert into cashflow.recurring_transaction(tenant_id,owner_id,name,type,amount,currency,frequency,next_date)values(v_tenant.id,v_uid,'Nómina producto','OUT',9200000,'CLP','MONTHLY',v_today+18),(v_tenant.id,v_uid,'Cloud y herramientas','OUT',2600000,'CLP','MONTHLY',v_today+8),(v_tenant.id,v_uid,'Cobros recurrentes','IN',13100000,'CLP','MONTHLY',v_today+12);
+ perform cashflow.create_saas_subscription(v_tenant.id,'Cliente Atlas Demo','Growth',4800000,v_today-120);perform cashflow.create_saas_subscription(v_tenant.id,'Cliente Nova Demo','Scale',5200000,v_today-90);perform cashflow.create_saas_subscription(v_tenant.id,'Cliente Orbit Demo','Growth',3100000,v_today-60);
+ insert into cashflow.unit_economics_input(tenant_id,owner_id,period,acquisition_spend,delivery_costs,customers_acquired)values(v_tenant.id,v_uid,date_trunc('month',v_today)::date,4200000,3900000,5);
+ insert into cashflow.weekly_financial_close(tenant_id,owner_id,week_start,as_of,status,snapshot,note,closed_at)values(v_tenant.id,v_uid,date_trunc('week',v_today-7)::date,v_today-7,'CLOSED_WITH_RISKS',jsonb_build_object('core',jsonb_build_object('current_cash',85250000),'alerts',jsonb_build_object('summary',jsonb_build_object('critical',0,'warning',2,'info',1)),'unit_economics',jsonb_build_object('assessment','WATCH'),'checklist','[]'::jsonb),'Demo: vigilar burn y renovación',now()-interval'7 days')returning id into v_close;
+ insert into cashflow.msp_task(tenant_id,owner_id,weekly_close_id,title,priority,status,assignee,due_date,source,deep_link,expected_cash_impact)values(v_tenant.id,v_uid,v_close,'Revisar MRR y renovaciones próximas','HIGH','IN_PROGRESS','CEO',v_today+2,'WEEKLY_CLOSE','/subscriptions#renewals',1800000),(v_tenant.id,v_uid,v_close,'Validar burn antes de contratar','HIGH','OPEN','Finanzas',v_today+4,'WEEKLY_CLOSE','/dashboard',-950000),(v_tenant.id,v_uid,v_close,'Mejorar payback de adquisición','MEDIUM','OPEN','Growth',v_today+7,'WEEKLY_CLOSE','/weekly-close',1200000);
+ insert into cashflow.denarius_user_preference(owner_id,active_tenant_id)values(v_uid,v_tenant.id)on conflict(owner_id)do update set active_tenant_id=excluded.active_tenant_id,updated_at=now();insert into cashflow.demo_reset_audit(owner_id,tenant_id)values(v_uid,v_tenant.id);return v_tenant;
+end$$;
+revoke all on function cashflow.reset_denarius_demo_startup()from public,anon;grant execute on function cashflow.reset_denarius_demo_startup()to authenticated;

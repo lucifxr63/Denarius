@@ -1,13 +1,17 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Wallet, LogOut, TrendingDown, Timer, Flame, Settings, RotateCcw, HelpCircle, LayoutGrid, Target } from 'lucide-react';
+import { Wallet, LogOut, TrendingDown, Timer, Flame, Settings, RotateCcw, HelpCircle, LayoutGrid, BarChart3, FilePlus2, Upload, List, Repeat2, ShieldCheck, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Kpi } from '@/components/Kpi';
 import { RestrictedCashKpi } from '@/components/RestrictedCashKpi';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { WorkspaceSwitcher } from '@/components/layout/WorkspaceSwitcher';
+import { ProductHeader } from '@/components/layout/ProductHeader';
 import { CashflowChart } from '@/components/CashflowChart';
+import { DemoFinancialStory } from '@/components/dashboard/DemoFinancialStory';
+import { StartupFinancialStory } from '@/components/dashboard/StartupFinancialStory';
+import { DecisionJourney } from '@/components/decision-story/DecisionJourney';
 import { BidsPanel } from '@/components/BidsPanel';
 import { ChileCompraPanel } from '@/components/ChileCompraPanel';
 import { InvoiceForm } from '@/components/InvoiceForm';
@@ -19,6 +23,7 @@ import { AccountsCard } from '@/components/AccountsCard';
 import { InvoicesList } from '@/components/InvoicesList';
 import { MovementsList } from '@/components/MovementsList';
 import { TenantSettings } from '@/components/TenantSettings';
+import { CsvTransactionImporter } from '@/components/CsvTransactionImporter';
 import { WelcomeTour } from '@/components/WelcomeTour';
 import { useCashflow } from '@/hooks/useCashflow';
 import { useAuth } from '@/store/auth';
@@ -108,11 +113,18 @@ export function Dashboard() {
     [visInvoices, visRecurring, today, granularity, taxRate],
   );
   const overdue = useMemo(() => overdueReceivables(visInvoices, today), [visInvoices, today]);
+  const pendingReceivables = useMemo(() => cf.invoices.filter(i=>i.type==='AR'&&i.status==='PENDING').reduce((sum,i)=>sum+Number(i.total_amount),0),[cf.invoices]);
+  const pendingPayables = useMemo(() => cf.invoices.filter(i=>i.type==='AP'&&i.status==='PENDING').reduce((sum,i)=>sum+Number(i.total_amount),0),[cf.invoices]);
+  const fixedIncome=useMemo(()=>cf.recurringTransactions.filter(r=>r.type==='IN').reduce((sum,r)=>sum+Number(r.amount),0),[cf.recurringTransactions]);
+  const fixedCosts=useMemo(()=>cf.recurringTransactions.filter(r=>r.type==='OUT').reduce((sum,r)=>sum+Number(r.amount),0),[cf.recurringTransactions]);
 
   const runwayLabel =
     kpis.runwayMonths === null ? '∞' : kpis.runwayMonths > 24 ? '> 24 meses' : `${kpis.runwayMonths.toFixed(1)} meses`;
   const hasAccounts = cf.accounts.length > 0;
   const simActive = ignored.size > 0;
+  const canManage = cf.permissions.includes('team.manage');
+  const canFinancialWrite = cf.permissions.includes('financial.write');
+  const canOperate = canFinancialWrite || cf.permissions.includes('operations.write');
 
   // Wrappers con toast de éxito para los formularios de creación.
   const addInvoice = async (v: Parameters<typeof cf.addInvoice>[0]) => {
@@ -138,17 +150,35 @@ export function Dashboard() {
 
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background/80 px-6 py-4 backdrop-blur">
+      <ProductHeader
+        actions={
+          <>
+            <Button variant="ghost" className="min-h-11 w-full justify-start" onClick={() => setTourOpen(true)}>
+              <HelpCircle className="size-4" aria-hidden="true" /> Tutorial
+            </Button>
+            {cf.tenant && canManage && (
+              <Button variant="ghost" className="min-h-11 w-full justify-start" onClick={() => setShowSettings(true)}>
+                <Settings className="size-4" aria-hidden="true" /> Ajustes
+              </Button>
+            )}
+            <Button variant="ghost" className="min-h-11 w-full justify-start" onClick={() => signOut()}>
+              <LogOut className="size-4" aria-hidden="true" /> Cerrar sesión
+            </Button>
+          </>
+        }
+      />
+      {false && (
+      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background/80 px-3 py-4 backdrop-blur sm:px-6">
         <span className="flex items-center gap-2.5 font-semibold">
           <span className="grid size-8 place-items-center rounded-lg bg-primary/15 text-primary">
             <Wallet className="size-5" aria-hidden="true" />
           </span>
-          <span className="font-display text-lg font-bold">Denarius</span>
+          <span className="hidden font-display text-lg font-bold sm:inline">Denarius</span>
         </span>
         <div className="flex items-center gap-2 sm:gap-3">
           <WorkspaceSwitcher />
           <Link
-            to="/workspace"
+            to="/dashboard"
             className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-transparent px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
             aria-label="Vista por modelo"
           >
@@ -167,19 +197,21 @@ export function Dashboard() {
               <span className="hidden sm:inline">Ajustes</span>
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={() => signOut()}>
+          <Button variant="outline" size="sm" onClick={() => signOut()} aria-label="Salir">
             <LogOut className="size-4" aria-hidden="true" />
-            Salir
+            <span className="hidden sm:inline">Salir</span>
           </Button>
         </div>
       </header>
+      )}
 
       <WelcomeTour open={tourOpen} onClose={closeTour} />
       {showSettings && cf.tenant && (
         <TenantSettings tenant={cf.tenant} onSave={cf.updateSettings} onClose={() => setShowSettings(false)} />
       )}
 
-      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+        {cf.tenant?.is_demo && <DecisionJourney active={1} />}
         {cf.error && (
           <p role="alert" className="mb-6 rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
             {cf.error}
@@ -188,12 +220,13 @@ export function Dashboard() {
 
         {cf.loading ? (
           <DashboardSkeleton />
-        ) : !hasAccounts ? (
+        ) : !hasAccounts && canManage ? (
           <div className="py-10">
             <AccountSetup onCreate={cf.addAccount} />
           </div>
         ) : (
           <>
+            {cf.tenant?.is_demo && (cf.tenant.business_model==='startup-saas'?<StartupFinancialStory cash={kpis.currentCash} fixedIncome={fixedIncome} fixedCosts={fixedCosts} lowest={kpis.lowestBalance}/>:<DemoFinancialStory cash={kpis.currentCash} receivables={pendingReceivables} payables={pendingPayables} lowest={kpis.lowestBalance} overdue={overdue.length}/>)}
             <div className="mb-8">
               <h1 className="font-display text-3xl font-bold tracking-tight">
                 Hola{user?.user_metadata?.full_name ? `, ${String(user.user_metadata.full_name).split(' ')[0]}` : ''}
@@ -201,13 +234,18 @@ export function Dashboard() {
               <p className="mt-1 text-muted-foreground">{cf.tenant?.name ?? 'Tu empresa'} · flujo de caja en tiempo real</p>
             </div>
 
+            <OperationsNav />
+
             {/* KPIs */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div id="financial-kpis" className="scroll-mt-40 mt-8">
+              <SectionIntro title="Resumen operativo" description="La posición actual antes de registrar nuevos cambios." />
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
               <Kpi label="Caja actual" value={formatCLP(kpis.currentCash)} icon={<Wallet className="size-4" />} tone={kpis.currentCash >= 0 ? 'text-primary' : 'text-danger'} />
               <Kpi label="Burn mensual" value={kpis.monthlyBurn > 0 ? `${formatCLP(kpis.monthlyBurn)}/mes` : 'Sin quema'} icon={<Flame className="size-4" />} tone={kpis.monthlyBurn > 0 ? 'text-danger' : 'text-primary'} />
               <Kpi label="Runway" value={runwayLabel} icon={<Timer className="size-4" />} tone={kpis.runwayMonths !== null && kpis.runwayMonths < 3 ? 'text-danger' : 'text-foreground'} />
               <Kpi label="Saldo mínimo proyectado" value={formatCLP(kpis.lowestBalance)} sub={kpis.lowestDate ?? undefined} icon={<TrendingDown className="size-4" />} tone={kpis.lowestBalance < 0 ? 'text-danger' : 'text-foreground'} />
-              <RestrictedCashKpi tenantId={cf.tenant?.id ?? null} heuristicValue={restricted} taxRate={taxRate} />
+                <RestrictedCashKpi tenantId={cf.tenant?.id ?? null} heuristicValue={restricted} taxRate={taxRate} />
+              </div>
             </div>
 
             {/* Simulador activo */}
@@ -221,7 +259,9 @@ export function Dashboard() {
             )}
 
             {/* Gráfico + cuentas */}
-            <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_300px]">
+            <div id="cash-projection" className="scroll-mt-40 mt-8">
+              <SectionIntro title="Proyección y cuentas" description="Anticipa el punto más bajo y confirma dónde está la caja." />
+              <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
               <CashflowChart
                 data={chartData}
                 granularity={granularity}
@@ -229,12 +269,15 @@ export function Dashboard() {
                 lowest={kpis.lowestDate ? { date: kpis.lowestDate, balance: kpis.lowestBalance } : null}
                 simulatedData={simChartData}
               />
-              <AccountsCard accounts={cf.accounts} onAdd={cf.addAccount} onEdit={cf.editAccount} onRemove={cf.removeAccount} />
+                <AccountsCard accounts={cf.accounts} onAdd={cf.addAccount} onEdit={cf.editAccount} onRemove={cf.removeAccount} canManage={canManage} />
+              </div>
             </div>
 
+            <div id="collections" className="scroll-mt-40 mt-8">
+              <SectionIntro title="Cobranza y compromisos fijos" description="Resuelve vencimientos y mantén actualizados los movimientos recurrentes." />
             {overdue.length > 0 && (
-              <div className="mt-8">
-                <ResolutionCenter overdue={overdue} onResolve={resolveOverdue} />
+              <div id="overdue-invoices" className="scroll-mt-24 mt-8">
+                <ResolutionCenter overdue={overdue} onResolve={resolveOverdue} canOperate={canOperate} />
               </div>
             )}
 
@@ -251,28 +294,71 @@ export function Dashboard() {
             )}
 
             <div className="mt-8 grid gap-6 lg:grid-cols-2">
-              <RecurringPanel items={cf.recurringTransactions} onAdd={addRecurring} onRemove={removeRecurring} ignoredIds={ignored} onToggleIgnore={toggleIgnore} />
-              <BidsPanel items={bids} onAdd={addBid} onRemove={removeBid} onToggleActive={toggleBid} />
+              <RecurringPanel items={cf.recurringTransactions} onAdd={addRecurring} onRemove={removeRecurring} ignoredIds={ignored} onToggleIgnore={toggleIgnore} canManage={canFinancialWrite} />
+              {canOperate ? <BidsPanel items={bids} onAdd={addBid} onRemove={removeBid} onToggleActive={toggleBid} /> : <RestrictedAction message="Tu rol permite consultar oportunidades, pero no modificar simulaciones." />}
             </div>
 
-            <div className="mt-8">
+            {canOperate && <div className="mt-8">
               <ChileCompraPanel onSimulate={addBid} />
+            </div>}
             </div>
 
-            <div className="mt-8 grid gap-6 lg:grid-cols-2">
+            <div id="quick-entry" className="scroll-mt-40 mt-8">
+              <SectionIntro title="Registro rápido" description="Agrega una factura o movimiento sin salir del centro operativo." />
+              {canOperate ? <div className="grid gap-6 lg:grid-cols-2">
               <InvoiceForm onSubmit={addInvoice} onParse={cf.parsePdf} pdfUsed={cf.pdfUsed} pdfLimit={cf.pdfLimit} />
               <MovementForm accounts={cf.accounts} onSubmit={addTransaction} />
+              </div> : <RestrictedAction message="Tu rol permite consultar la caja, pero no registrar operaciones. Solicita acceso de Finanzas u Operaciones al administrador." />}
             </div>
 
-            <div className="mt-8 grid gap-6 lg:grid-cols-2">
-              <InvoicesList invoices={cf.invoices} onResolve={cf.resolveInvoice} onDelete={cf.removeInvoice} ignoredIds={ignored} onToggleIgnore={toggleIgnore} />
-              <MovementsList transactions={cf.transactions} onDelete={cf.removeTransaction} />
+            {canManage && <div id="data-import" className="scroll-mt-40 mt-8">
+              <SectionIntro title="Importación masiva" description="Actualiza varios movimientos desde un archivo CSV validado." />
+              <CsvTransactionImporter accounts={cf.accounts} onImported={cf.refresh} />
+            </div>}
+
+            <div id="history" className="scroll-mt-40 mt-8">
+              <SectionIntro title="Historial y correcciones" description="Consulta facturas y movimientos registrados y corrige solo cuando sea necesario." />
+              <div className="grid gap-6 lg:grid-cols-2">
+              <InvoicesList invoices={cf.invoices} onResolve={cf.resolveInvoice} onDelete={cf.removeInvoice} ignoredIds={ignored} onToggleIgnore={toggleIgnore} canOperate={canOperate} canDelete={canManage} />
+              <MovementsList transactions={cf.transactions} onDelete={cf.removeTransaction} canDelete={canManage} />
+              </div>
             </div>
           </>
         )}
       </main>
     </div>
   );
+}
+
+const OPERATION_SECTIONS = [
+  { href: '#financial-kpis', label: 'Resumen', icon: BarChart3 },
+  { href: '#cash-projection', label: 'Proyección', icon: TrendingDown },
+  { href: '#collections', label: 'Cobranza y fijos', icon: Repeat2 },
+  { href: '#quick-entry', label: 'Registrar', icon: FilePlus2 },
+  { href: '#data-import', label: 'Importar', icon: Upload },
+  { href: '#history', label: 'Historial', icon: List },
+];
+
+function OperationsNav() {
+  return (
+    <nav aria-label="Secciones de operaciones" className="sticky top-16 z-20 rounded-xl border border-border bg-background/95 p-2 shadow-sm backdrop-blur">
+      <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-6">
+        {OPERATION_SECTIONS.map(({ href, label, icon: Icon }) => (
+          <a key={href} href={href} className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg px-2 text-center text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 sm:text-sm">
+            <Icon className="size-4 shrink-0" aria-hidden="true" /> {label}
+          </a>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
+function SectionIntro({ title, description }: { title: string; description: string }) {
+  return <div className="mb-3"><h2 className="text-lg font-semibold">{title}</h2><p className="text-sm text-muted-foreground">{description}</p></div>;
+}
+
+function RestrictedAction({ message }: { message: string }) {
+  return <div className="flex min-h-32 items-center gap-3 rounded-2xl border border-dashed border-border bg-muted/30 p-5"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><ShieldCheck className="size-5" aria-hidden="true" /></span><div><p className="text-sm font-semibold">Vista protegida por rol</p><p className="mt-1 max-w-2xl text-sm text-muted-foreground">{message}</p></div></div>;
 }
 
 function DashboardSkeleton() {

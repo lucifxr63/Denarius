@@ -1,0 +1,11 @@
+import fs from 'node:fs';import{createClient}from'@supabase/supabase-js';
+const env=Object.fromEntries(fs.readFileSync('.env.local','utf8').split(/\r?\n/).filter(line=>/^\s*[A-Za-z_][A-Za-z0-9_]*\s*=/.test(line)).map(line=>{const i=line.indexOf('=');return[line.slice(0,i).trim(),line.slice(i+1).trim().replace(/^(['"])(.*)\1$/,'$2')]}));
+const client=createClient(env.VITE_SUPABASE_URL,env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}});
+const{data:tenants,error:tenantError}=await client.schema('cashflow').from('tenant').select('owner_id,name').eq('name','Mi empresa');if(tenantError)throw tenantError;
+const ownerIds=new Set((tenants??[]).map(item=>item.owner_id));const{data,error}=await client.auth.admin.listUsers({page:1,perPage:1000});if(error)throw error;
+const preliminary=data.users.filter(user=>ownerIds.has(user.id)&&String(user.user_metadata?.full_name??user.user_metadata?.name??'').split(' ')[0].toLocaleLowerCase('es')==='luciano');
+const{data:demoAccounts,error:accountError}=await client.schema('cashflow').from('bank_account').select('owner_id').eq('current_balance',3057667);if(accountError)throw accountError;const demoOwners=new Set((demoAccounts??[]).map(item=>item.owner_id));
+const candidates=preliminary.filter(user=>demoOwners.has(user.id));
+if(candidates.length!==1)throw new Error(`No se pudo identificar de forma unívoca la cuenta actual (${candidates.length} candidatas).`);
+const user=candidates[0];const appMetadata={...user.app_metadata,denarius_role:'platform_admin'};const{error:updateError}=await client.auth.admin.updateUserById(user.id,{app_metadata:appMetadata});if(updateError)throw updateError;
+console.log('ADMIN_ASSIGNED',{user_id:user.id.slice(0,8)+'…',role:'platform_admin',scope:'denarius'});

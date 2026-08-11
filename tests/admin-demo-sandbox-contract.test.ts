@@ -1,0 +1,5 @@
+import test from'node:test';import assert from'node:assert/strict';import fs from'node:fs';const sql=fs.readFileSync('supabase/migrations/20260810170000_den119_admin_demo_sandbox.sql','utf8');
+test('reset requiere admin y sólo elimina el tenant demo propio',()=>{assert.match(sql,/denarius_role.*platform_admin/);assert.match(sql,/delete from cashflow\.tenant where owner_id=v_uid and is_demo=true/);assert.doesNotMatch(sql,/delete from auth\.users|delete from public\.profiles/)});
+test('sandbox contiene datos de todo el happy flow',()=>{for(const table of['bank_account','transaction','invoice','recurring_transaction','unit_economics_input','weekly_financial_close','msp_task'])assert.match(sql,new RegExp(`cashflow\\.${table}`))});
+test('reset activa el sandbox y deja auditoría',()=>{assert.match(sql,/denarius_user_preference/);assert.match(sql,/demo_reset_audit/);assert.match(sql,/unique index.*demo.*owner/i)});
+test('el origen del modelo respeta el contrato vigente',()=>{assert.match(sql,/'pyme-tradicional','manual'/);assert.doesNotMatch(sql,/'pyme-tradicional','demo'/)});

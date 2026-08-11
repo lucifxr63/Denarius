@@ -8,13 +8,14 @@ import {
   listTransactions,
   listInvoices,
   listRecurringTransactions,
-  createInvoice,
   updateInvoice,
   deleteInvoice,
   createAccount,
   createTransaction,
   deleteTransaction,
-  createRecurringTransaction,
+  createDelegatedInvoice,
+  createDelegatedRecurring,
+  getDenariusAccessContext,
   deleteRecurringTransaction,
   uploadAndParsePdf,
   getPdfUsage,
@@ -42,18 +43,21 @@ export function useCashflow() {
   const [pdfUsed, setPdfUsed] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [permissions,setPermissions]=useState<string[]>([]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [t, accs, txs, invs, recs, usage] = await Promise.all([
-        getDefaultTenant(),
-        listAccounts(),
-        listTransactions(),
-        listInvoices(),
-        listRecurringTransactions(),
+      const t = await getDefaultTenant();
+      if (!t) throw new Error('No encontramos una empresa activa.');
+      const [accs, txs, invs, recs, usage,access] = await Promise.all([
+        listAccounts(t.id),
+        listTransactions(t.id),
+        listInvoices(t.id),
+        listRecurringTransactions(t.id),
         getPdfUsage(),
+        getDenariusAccessContext(t.id),
       ]);
       setTenant(t);
       setAccounts(accs);
@@ -61,6 +65,7 @@ export function useCashflow() {
       setInvoices(invs);
       setRecurringTransactions(recs);
       setPdfUsed(usage);
+      setPermissions(access.permissions);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error cargando datos');
     } finally {
@@ -133,7 +138,7 @@ export function useCashflow() {
       source_system?: SourceSystem;
     }) => {
       if (!tenant) throw new Error('Sin tenant');
-      await createInvoice({ ...input, tenant_id: tenant.id });
+      await createDelegatedInvoice({ ...input, tenant_id: tenant.id });
       await refresh();
     },
     [tenant, refresh],
@@ -168,7 +173,7 @@ export function useCashflow() {
   const addRecurringTransaction = useCallback(
     async (input: { type: TxType; name: string; amount: number; frequency: Frequency; next_date: string }) => {
       if (!tenant) throw new Error('Sin tenant');
-      await createRecurringTransaction({ ...input, tenant_id: tenant.id });
+      await createDelegatedRecurring({ ...input, tenant_id: tenant.id });
       await refresh();
     },
     [tenant, refresh],
@@ -202,6 +207,7 @@ export function useCashflow() {
     pdfLimit: PDF_MONTHLY_LIMIT,
     loading,
     error,
+    permissions,
     refresh,
     addAccount,
     editAccount,
