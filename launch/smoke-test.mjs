@@ -5,10 +5,18 @@
 // Uso:  node launch/smoke-test.mjs
 // Opcional: APP_URL, SUPABASE_URL por entorno para apuntar a otro destino.
 
-const APP_URL = (process.env.APP_URL ?? 'https://cashflow.scouttech.lat').replace(/\/$/, '');
+const APP_URL = (process.env.APP_URL ?? 'https://denarius.scouttech.lat').replace(/\/$/, '');
 const SUPABASE_URL = (process.env.SUPABASE_URL ?? 'https://fcdhcntyvsydnvjwopfe.supabase.co').replace(/\/$/, '');
 const ORIGIN = APP_URL;
-const FUNCTIONS = ['cashflow-invoices', 'cashflow-recurring', 'cashflow-parse-pdf'];
+const FUNCTIONS = [
+  'cashflow-invoices',
+  'cashflow-recurring',
+  'cashflow-parse-pdf',
+  'cashflow-tenant-settings',
+  'cashflow-analytics',
+  'denarius-tools',
+  'denarius-mcp',
+];
 const TIMEOUT_MS = 10_000;
 
 let failures = 0;
@@ -66,7 +74,7 @@ async function phase2() {
 // ── Fase 3: Barrera RLS / JWT (sin Authorization → 401) ─────
 async function phase3() {
   phase(3, 'Barrera RLS / JWT');
-  for (const fn of ['cashflow-invoices', 'cashflow-parse-pdf']) {
+  for (const fn of ['cashflow-invoices', 'cashflow-parse-pdf', 'denarius-tools', 'denarius-mcp']) {
     const url = `${SUPABASE_URL}/functions/v1/${fn}`;
     try {
       const res = await req(url, {

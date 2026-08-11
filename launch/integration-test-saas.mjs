@@ -55,8 +55,8 @@ const EXPECT = {
 };
 
 const tag = Date.now();
-const userA = { email: `cf-saas-a-${tag}@scouttech.lat`, password: `Test-${tag}-aa` };
-const userB = { email: `cf-saas-b-${tag}@scouttech.lat`, password: `Test-${tag}-bb` };
+const userA = { email: `cf-saas-a-${tag}@scouttech.lat`, password: crypto.randomUUID() + 'Aa1!' };
+const userB = { email: `cf-saas-b-${tag}@scouttech.lat`, password: crypto.randomUUID() + 'Aa1!' };
 let idA, idB;
 
 async function run() {

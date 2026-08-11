@@ -1,0 +1,5 @@
+import assert from 'node:assert/strict';import fs from 'node:fs';import test from 'node:test'
+const sql=fs.readFileSync('supabase/migrations/20260807110000_actionable_financial_onboarding.sql','utf8');const gate=fs.readFileSync('src/components/onboarding/BusinessModelGate.tsx','utf8');const setup=fs.readFileSync('src/components/onboarding/FinancialBaselineSetup.tsx','utf8')
+test('onboarding crea línea base atómica y resuelve identidad en servidor',()=>{assert.match(sql,/security definer set search_path/);assert.match(sql,/auth\.uid\(\)/);assert.match(sql,/insert into cashflow\.bank_account/);assert.match(sql,/insert into cashflow\.recurring_transaction/);assert.doesNotMatch(sql,/drop table|truncate/i)})
+test('usuarios existentes con cuenta no repiten el onboarding',()=>{assert.match(gate,/accounts\.length > 0/);assert.match(gate,/if \(!hasAccount\)/)})
+test('la interfaz exige datos para una primera proyección',()=>{assert.match(setup,/monthlyIncome/);assert.match(setup,/monthlyCosts/);assert.match(setup,/Crear mi primera proyección/)})

@@ -9,6 +9,9 @@ import {
   Repeat,
   Activity,
   PiggyBank,
+  CircleDollarSign,
+  Gauge,
+  TrendingUp,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { WidgetMetric, MetricTone } from '@/hooks/useDashboardMetricsPayload';
@@ -105,10 +108,28 @@ export const ReceivablesWidget = (p: WidgetProps) => <MetricCard {...p} icon={Fi
 
 // ── Widgets nombrados (Startup SaaS) ────────────────────────────────────────
 export const BurnRateWidget = (p: WidgetProps) => <MetricCard {...p} icon={Flame} />;
+export const GrossBurnWidget = (p: WidgetProps) => <MetricCard {...p} icon={CircleDollarSign} />;
 export const RunwayWidget = (p: WidgetProps) => <MetricCard {...p} icon={Timer} />;
 export const MrrWidget = (p: WidgetProps) => <MetricCard {...p} icon={Repeat} />;
+export const MrrGrowthWidget = (p: WidgetProps) => <MetricCard {...p} icon={TrendingUp} />;
+export const BurnMultipleWidget = (p: WidgetProps) => <MetricCard {...p} icon={Gauge} />;
 export const BurnTrendWidget = (p: WidgetProps) => <ChartCard {...p} icon={Activity} />;
 export const CashBalanceWidget = (p: WidgetProps) => <MetricCard {...p} icon={PiggyBank} />;
+export const NewMrrWidget = (p: WidgetProps) => <MetricCard {...p} icon={TrendingUp} />;
+export const ExpansionMrrWidget = (p: WidgetProps) => <MetricCard {...p} icon={Activity} />;
+export const ChurnedMrrWidget = (p: WidgetProps) => <MetricCard {...p} icon={TrendingDown} />;
+export const ChurnRateWidget = (p: WidgetProps) => <MetricCard {...p} icon={Gauge} />;
+export const ActiveCustomersWidget = (p: WidgetProps) => <MetricCard {...p} icon={Repeat} />;
+export const NrrWidget = (p: WidgetProps) => <MetricCard {...p} icon={TrendingUp} />;
+export const GrrWidget = (p: WidgetProps) => <MetricCard {...p} icon={Gauge} />;
+export const LogoChurnWidget = (p: WidgetProps) => <MetricCard {...p} icon={TrendingDown} />;
+export const RetentionTrendWidget = (p: WidgetProps) => <ChartCard {...p} icon={Activity} />;
+export const TopConcentrationWidget = (p: WidgetProps) => <MetricCard {...p} icon={Gauge} />;
+export const AtRiskMrrWidget = (p: WidgetProps) => <MetricCard {...p} icon={TrendingDown} />;
+export const AtRiskCustomersWidget = (p: WidgetProps) => <MetricCard {...p} icon={FileClock} />;
+export const OverdueRenewalsWidget = (p: WidgetProps) => <MetricCard {...p} icon={FileClock} />;
+export const UpcomingRenewalsWidget = (p: WidgetProps) => <MetricCard {...p} icon={Timer} />;
+export const RenewalMrrWidget = (p: WidgetProps) => <MetricCard {...p} icon={Repeat} />;
 
 // Registro: widgetId (del JSON) → componente. El DashboardCanvas resuelve aquí.
 export const WIDGET_REGISTRY: Record<string, (p: WidgetProps) => React.ReactElement> = {
@@ -118,8 +139,26 @@ export const WIDGET_REGISTRY: Record<string, (p: WidgetProps) => React.ReactElem
   liquidityProjectionWidget: LiquidityProjectionWidget,
   receivablesWidget: ReceivablesWidget,
   burnRateWidget: BurnRateWidget,
+  grossBurnWidget: GrossBurnWidget,
   runwayWidget: RunwayWidget,
   mrrWidget: MrrWidget,
+  mrrGrowthWidget: MrrGrowthWidget,
+  burnMultipleWidget: BurnMultipleWidget,
   burnTrendWidget: BurnTrendWidget,
   cashBalanceWidget: CashBalanceWidget,
+  newMrrWidget: NewMrrWidget,
+  expansionMrrWidget: ExpansionMrrWidget,
+  churnedMrrWidget: ChurnedMrrWidget,
+  churnRateWidget: ChurnRateWidget,
+  activeCustomersWidget: ActiveCustomersWidget,
+  nrrWidget: NrrWidget,
+  grrWidget: GrrWidget,
+  logoChurnWidget: LogoChurnWidget,
+  retentionTrendWidget: RetentionTrendWidget,
+  topConcentrationWidget: TopConcentrationWidget,
+  atRiskMrrWidget: AtRiskMrrWidget,
+  atRiskCustomersWidget: AtRiskCustomersWidget,
+  overdueRenewalsWidget: OverdueRenewalsWidget,
+  upcomingRenewalsWidget: UpcomingRenewalsWidget,
+  renewalMrrWidget: RenewalMrrWidget,
 };

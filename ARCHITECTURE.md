@@ -1,75 +1,70 @@
-# Cashflow — Anexo de Arquitectura (esquema `cashflow` en producción)
+# Arquitectura de Denarius
 
-> Estado: **EN PRODUCCIÓN** · Proyecto Supabase compartido con Validus
-> (`fcdhcntyvsydnvjwopfe`). Última actualización: 2026-06-23.
+> Fuente vigente al 2026-08-11. Producción: `https://denarius.scouttech.lat`.
 
-## 1. Aislamiento de esquema
+## Vista general
 
-Cashflow opera **íntegramente bajo el esquema `cashflow`**, aislado de `public`
-(donde vive Validus). La única superficie compartida es `auth.users` (para SSO
-futuro). El cliente Supabase fija `db.schema = 'cashflow'`
-(`createClient<Database, 'cashflow'>`), de modo que `supabase.from('…')` resuelve
-contra `cashflow.*` sin `.schema()` por llamada. Las migraciones de cashflow
-**nunca** tocan `public`.
+Denarius es una SPA React/TypeScript desplegada en Vercel. Supabase aporta autenticación, Postgres, Row Level Security y Edge Functions. La web y el MCP consumen una misma capa financiera y preservan a Denarius como fuente de verdad.
 
-> ⚠️ El tracking de migraciones de este proyecto está roto (ver memoria del
-> equipo). **Nunca** `supabase db push`. Aplicar cada migración aislada vía SQL
-> Editor o Management API query endpoint (una transacción) y registrar la versión
-> en `supabase_migrations.schema_migrations`.
+```text
+Web (React/Vite) ───────┐
+                       ├─ Edge Functions/RPC ─ Postgres (`cashflow`)
+Claude (OAuth MCP) ─────┤                         │
+Desktop (API key) ──────┘                    RLS + auditoría
+```
 
-## 2. Modelo de seguridad — Flat RLS
+## Plataforma e identidad compartidas
 
-Regla rectora (de `context.md`): **prohibido JOIN/subconsultas en políticas RLS**
-(presupuesto <50ms). Reconciliación adoptada en todo el esquema:
+El proyecto Supabase se comparte con Validus, Licitus y Animus. `auth.users` representa la identidad común. Denarius no guarda sus roles en metadata global ni elimina la identidad al suspender o retirar un miembro.
 
-- Se **desnormaliza `owner_id` (= `auth.uid()`)** en *todas* las tablas
-  tenant-scoped. La política es plana y sin JOIN:
-  ```sql
-  using (owner_id = (select auth.uid()))
-  with check (owner_id = (select auth.uid()))
-  ```
-- `tenant_id` / `account_id` se conservan solo para integridad relacional
-  (FK + `ON DELETE CASCADE`), no para autorización.
-- `owner_id` referencia `auth.users(id) ON DELETE CASCADE` → borrar el usuario
-  central purga todas sus filas (cumple privacidad + permite teardown atómico).
-- En cada `INSERT` el cliente inyecta `owner_id` desde la sesión (lo exige el
-  `WITH CHECK`); omitirlo hace que Postgres rechace la operación (error 42501).
+Los objetos de negocio, membresías, permisos, claves MCP, grants, auditoría y métricas de Denarius se aíslan en el esquema `cashflow`. Toda migración debe ser aditiva. Están prohibidos `DROP`, `TRUNCATE`, renombres destructivos y `supabase db push` no controlado; la recuperación de datos usa correcciones hacia adelante.
 
-## 3. Inventario de tablas
+## Autorización multiempresa
 
-**Núcleo PRD (flujo de caja genérico):**
-`tenant` (`owner_id`, `default_tax_rate`, `weekly_alerts_enabled`) → `bank_account`
-(`current_balance`, mantenido por trigger) → `transaction` (IN/OUT) ; `tenant` →
-`invoice` (AR/AP, `status`, `source_system`, `due_date`). Auxiliares:
-`profiles`, `recurring_transaction` (IN/OUT), `pdf_usage` (cuota Beta).
+La autorización combina sesión, compañía activa, membresía y permiso. El servidor resuelve el tenant; identificadores enviados por un cliente nunca sustituyen ese contexto. Las certificaciones cubren aislamiento cross-tenant en web, RPC y MCP.
 
-**Lente SaaS / control interno (migración `20260704000000`, vivo desde 2026-06-23):**
-- `partner_contributions` — aportes de socios (premisa: préstamo a la empresa).
-- `expense` — gastos con fuente de fondeo (`funded_by` COMPANY/PARTNER) + desglose
-  neto / IVA / total.
-- `revenue` — ingresos SaaS multimoneda (USD→CLP, comisión de pasarela). El KPI de
-  caja es `net_income_clp`; bruto y comisión quedan como desglose.
+Permisos vigentes:
 
-**IVA configurable (sin 19% rígido):** `expense` y `revenue` llevan
-`vat_status` (`AFECTO` | `EXENTO`) + `vat_amount` editable. La integración con SII
-se calendariza para Fase 2.
+- `financial.read`
+- `financial.write`
+- `operations.write`
+- `close.read`
+- `close.manage`
+- `team.manage`
+- `mcp.manage`
 
-## 4. Edge Functions (Deno, JSON puro)
+Las plantillas de rol se describen en el README. El administrador de plataforma tiene una vía separada para preparar sandboxes demo.
 
-`cashflow-invoices`, `cashflow-recurring`, `cashflow-parse-pdf` (IA, Claude),
-`cashflow-tenant-settings`, `cashflow-weekly-cron` (dormante), y
-`cashflow-analytics` — agregación mensual: `GET ?tenant_id&period=YYYY-MM` →
-`{ metrics, breakdown }`. Cada función valida la sesión (`getUser`) y opera con el
-JWT del usuario, de modo que la RLS acota los datos.
+## Dominio de datos
 
-> **Deuda técnica:** `cashflow-analytics` calcula `initial_balance` agregando el
-> histórico al vuelo. Refactor a snapshots `pg_cron` atado a volumen futuro — ver
-> `Flujos/tech-debt-pgcron-snapshots.md`.
+El núcleo incluye compañías, membresías, cuentas bancarias, transacciones, facturas, recurrencias y configuración. Los módulos agregan importaciones, contexto de onboarding, proyección, alertas, cierres, unit economics, acciones y resultados. Startup SaaS añade clientes/suscripciones, MRR, lifecycle, retención, riesgo y renovaciones.
 
-## 5. Certificación
+Los cálculos deben indicar fecha de corte, moneda, confianza y fuentes. La caja tributaria se presenta separada de la caja disponible. Los cierres preservan snapshots para que cambios posteriores no reescriban la historia.
 
-`launch/integration-test-saas.mjs` certifica el pipeline del lente SaaS de punta a
-punta (insert vía RLS, rechazo de `owner_id` ajeno, contrato JSON de
-`cashflow-analytics`, aislamiento cross-tenant) bajo protocolo de **cero huella**
-(crea usuarios temporales y los borra; el cascade purga sus filas). Verde a
-2026-06-23. Frontend del lente: ruta `/saas` (`pages/SaasCashflow.tsx`).
+## MCP
+
+El gateway MCP implementa `2025-11-25`, JSON-RPC y descubrimiento OAuth. Admite grants OAuth por empresa y API keys cuyo secreto se muestra una vez y se conserva como hash. Los scopes MCP (`financial:read`, `alerts:read`, `actions:write`) se traducen a permisos Denarius y se verifican antes de ejecutar.
+
+El catálogo posee 14 herramientas. Las consultas nunca persisten simulaciones. Las escrituras solo crean/actualizan acciones financieras, exigen scope y aprobación explícita, y quedan auditadas. No se registran preguntas, argumentos, respuestas financieras ni secretos en la auditoría operativa.
+
+## Observabilidad y privacidad
+
+- Salud, errores y latencia se revisan por release.
+- Las ejecuciones MCP registran identidad técnica, empresa, herramienta, estado y duración, no contenido financiero.
+- Las métricas UX usan eventos y superficies predefinidos; rechazan propiedades libres y PII.
+- Soporte rechaza PII y dispone de procedimiento de revocación urgente de claves/grants.
+- Las certificaciones remotas crean sujetos efímeros y verifican cero huella al finalizar.
+
+## Release y recuperación
+
+El manifiesto en `release-manifests/current.json` fija release, artefactos y objetivo anterior. El frontend puede revertirse al deployment verificado. Las Edge Functions se redespliegan desde artefactos conocidos. La base no se revierte destructivamente: se aplica `forward-fix`.
+
+Puertas obligatorias:
+
+```bash
+npm run check
+npm run certify:beta-go-no-go
+npm run rollback:rehearse -- release-manifests/current.json
+```
+
+La evidencia actual se encuentra en [docs/certification/GO_NO_GO_BETA_2026-08-11.md](./docs/certification/GO_NO_GO_BETA_2026-08-11.md).

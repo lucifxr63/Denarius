@@ -4,7 +4,9 @@ import { supabase } from '@/lib/supabase';
 // Supabase compartido con Validus; este redirectTo (origin actual + /auth/callback)
 // ya está en la allowlist para dev (localhost:5174) y se debe añadir el dominio
 // de prod cuando exista.
-export async function signInWithGoogle(): Promise<void> {
+export async function signInWithGoogle(returnTo?: string): Promise<void> {
+  const safeReturnTo = returnTo?.startsWith('/') && !returnTo.startsWith('//') ? returnTo : '/dashboard';
+  sessionStorage.setItem('denarius_auth_return_to', safeReturnTo);
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {

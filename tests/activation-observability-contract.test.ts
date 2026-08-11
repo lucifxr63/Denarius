@@ -1,0 +1,5 @@
+import assert from 'node:assert/strict';import fs from 'node:fs';import test from 'node:test';
+const sql=fs.readFileSync('supabase/migrations/20260807150000_ops103_104_activation_observability.sql','utf8');const fn=fs.readFileSync('supabase/functions/denarius-tools/index.ts','utf8');
+test('activación usa hitos canónicos y respeta la empresa',()=>{assert.match(sql,/financial_onboarding_completed_at/);assert.match(sql,/min\(created_at\).*agent_tool_audit/s);assert.match(sql,/security definer/);assert.match(sql,/owner_id=v_uid/);assert.match(sql,/status='SUCCESS'/)});
+test('observabilidad registra canal y release, no contenido financiero',()=>{assert.match(fn,/release_id: RELEASE_ID/);assert.match(fn,/channel: principalKeyId \? 'MCP_API_KEY' : 'MCP_OAUTH'/);assert.doesNotMatch(sql,/question|arguments|response|amount|contact_name/i)});
+test('salud de release es sólo de servicio y agrega errores y p95',()=>{assert.match(sql,/auth\.role\(\)<>'service_role'/);assert.match(sql,/percentile_cont\(\.95\)/);assert.match(sql,/error_rate/);assert.match(sql,/revoke all on function cashflow\.release_health.*authenticated/)});

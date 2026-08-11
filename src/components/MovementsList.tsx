@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { ArrowUpRight, ArrowDownRight, Trash2 } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Trash2, ReceiptText } from 'lucide-react';
+import { OperationalEmptyState } from '@/components/OperationalEmptyState';
 import { formatCLP } from '@/lib/utils';
 import { useConfirm } from '@/components/ui/confirm';
 import type { Transaction } from '@/lib/queries';
@@ -8,9 +9,10 @@ import type { Transaction } from '@/lib/queries';
 interface Props {
   transactions: Transaction[];
   onDelete: (id: string) => Promise<void>;
+  canDelete?: boolean;
 }
 
-export function MovementsList({ transactions, onDelete }: Props) {
+export function MovementsList({ transactions, onDelete, canDelete=true }: Props) {
   const confirm = useConfirm();
   const [busy, setBusy] = useState<string | null>(null);
   const recent = transactions.slice(0, 8);
@@ -33,7 +35,7 @@ export function MovementsList({ transactions, onDelete }: Props) {
     <div className="rounded-2xl border border-border bg-card/60 p-5 backdrop-blur">
       <h3 className="mb-3 text-sm font-medium text-muted-foreground">Movimientos recientes</h3>
       {recent.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Aún no hay movimientos.</p>
+        <OperationalEmptyState icon={ReceiptText} title="Todavía no hay movimientos" description="Registra un ingreso o egreso real para construir el historial de caja." actionLabel="Registrar primer movimiento" href="#quick-entry" />
       ) : (
         <ul className="space-y-1.5">
           {recent.map((tx) => {
@@ -53,14 +55,14 @@ export function MovementsList({ transactions, onDelete }: Props) {
                   <span className={`text-sm font-medium ${income ? 'text-primary' : 'text-danger'}`}>
                     {income ? '+' : '-'}{formatCLP(Number(tx.amount))}
                   </span>
-                  <button
+                  {canDelete && <button
                     onClick={() => handleDelete(tx)}
                     disabled={busy === tx.id}
-                    className="grid size-7 place-items-center rounded-md text-muted-foreground opacity-0 transition-all hover:bg-muted hover:text-danger group-hover:opacity-100 cursor-pointer disabled:opacity-50"
+                    className="grid size-11 cursor-pointer place-items-center rounded-md text-muted-foreground opacity-100 transition-colors hover:bg-muted hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 disabled:opacity-50"
                     aria-label="Eliminar movimiento"
                   >
                     <Trash2 className="size-4" aria-hidden="true" />
-                  </button>
+                  </button>}
                 </span>
               </li>
             );

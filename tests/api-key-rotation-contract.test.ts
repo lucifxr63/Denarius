@@ -1,0 +1,5 @@
+import assert from 'node:assert/strict';import fs from 'node:fs';import test from 'node:test'
+const sql=fs.readFileSync('supabase/migrations/20260807120000_denarius_api_key_rotation.sql','utf8');const ui=fs.readFileSync('src/pages/McpConnections.tsx','utf8')
+test('rotación crea una única sucesora con bloqueo y gracia acotada',()=>{assert.match(sql,/for update/);assert.match(sql,/p_grace_minutes < 5/);assert.match(sql,/p_grace_minutes > 10080/);assert.match(sql,/denarius_api_key_single_replacement/);assert.match(sql,/replacement_key_id/)})
+test('gateway rechaza la clave anterior al vencer el solapamiento',()=>{assert.match(sql,/rotation_grace_ends_at is null or k\.rotation_grace_ends_at>now\(\)/);assert.match(sql,/revoked_at=k\.rotation_grace_ends_at/)})
+test('interfaz permite elegir clave y ventana sin volver a revelar secretos',()=>{assert.match(ui,/Rotar una conexión/);assert.match(ui,/rotationGrace/);assert.match(ui,/setSecret\(created\.secret\)/);assert.doesNotMatch(ui,/secret_hash/)})

@@ -38,6 +38,34 @@ function userClient() {
   return createClient(URL, ANON, { auth: { persistSession: false }, db: { schema: 'cashflow' } });
 }
 
+async function invokeWithTimeout(client, functionName, body, timeoutMs = 45_000) {
+  const { data: sessionData, error: sessionError } = await client.auth.getSession();
+  if (sessionError || !sessionData.session?.access_token) {
+    return { data: null, error: sessionError ?? new Error('Sesión ausente') };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(new Error(`${functionName} timeout ${timeoutMs}ms`)), timeoutMs);
+  try {
+    const response = await fetch(`${URL}/functions/v1/${functionName}`, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        apikey: ANON,
+        Authorization: `Bearer ${sessionData.session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await response.json().catch(() => null);
+    return response.ok ? { data, error: null } : { data, error: new Error(`${response.status}: ${JSON.stringify(data)}`) };
+  } catch (error) {
+    return { data: null, error };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 const INVOICE_LINES = ['FACTURA', 'Proveedor: Comercial Andes Ltda.', 'Fecha de emision: 2026-06-01', 'Fecha de vencimiento: 2026-07-01', 'Total a pagar: 150000 CLP'];
 const QUOTE_LINES = ['COTIZACION / PRESUPUESTO', 'Proveedor: Comercial Andes Ltda.', 'Validez de la oferta: 15 dias', 'Este documento NO es una factura ni tiene valor tributario', 'Total estimado: 150000 CLP'];
 
@@ -61,8 +89,8 @@ function buildPdf(lines) {
 }
 
 const tag = Date.now();
-const userA = { email: `cf-test-a-${tag}@scouttech.lat`, password: `Test-${tag}-aa` };
-const userB = { email: `cf-test-b-${tag}@scouttech.lat`, password: `Test-${tag}-bb` };
+const userA = { email: `cf-test-a-${tag}@scouttech.lat`, password: crypto.randomUUID() + 'Aa1!' };
+const userB = { email: `cf-test-b-${tag}@scouttech.lat`, password: crypto.randomUUID() + 'Aa1!' };
 let idA, idB;
 
 async function run() {
@@ -133,7 +161,7 @@ async function run() {
   section('Ingesta PDF con IA — factura válida (acepta)');
   const pathInv = `${idA}/${crypto.randomUUID()}.pdf`;
   await ca.storage.from('cashflow_docs').upload(pathInv, buildPdf(INVOICE_LINES), { contentType: 'application/pdf' });
-  const okParse = await ca.functions.invoke('cashflow-parse-pdf', { body: { tenant_id: tenantA, file_path: pathInv, expected_type: 'AR_OR_AP' } });
+  const okParse = await invokeWithTimeout(ca, 'cashflow-parse-pdf', { tenant_id: tenantA, file_path: pathInv, expected_type: 'AR_OR_AP' });
   const okData = okParse.data?.data;
   assert(!okParse.error && okData?.is_valid_invoice === true && okData?.extracted_fields?.total_amount != null,
     `Factura aceptada (is_valid=${okData?.is_valid_invoice}, total=${okData?.extracted_fields?.total_amount}, tipo=${okData?.extracted_fields?.type})`);
@@ -141,13 +169,18 @@ async function run() {
   section('Escudo anti-basura — cotización (bloquea)');
   const pathQuo = `${idA}/${crypto.randomUUID()}.pdf`;
   await ca.storage.from('cashflow_docs').upload(pathQuo, buildPdf(QUOTE_LINES), { contentType: 'application/pdf' });
-  const quoParse = await ca.functions.invoke('cashflow-parse-pdf', { body: { tenant_id: tenantA, file_path: pathQuo, expected_type: 'AR_OR_AP' } });
+  const quoParse = await invokeWithTimeout(ca, 'cashflow-parse-pdf', { tenant_id: tenantA, file_path: pathQuo, expected_type: 'AR_OR_AP' });
   const quoData = quoParse.data?.data;
   assert(!quoParse.error && quoData?.is_valid_invoice === false && typeof quoData?.rejection_reason === 'string' && quoData.rejection_reason.length > 0,
     `Cotización RECHAZADA (is_valid=${quoData?.is_valid_invoice}, motivo="${(quoData?.rejection_reason ?? '').slice(0, 60)}…")`);
 }
 
 async function cleanup() {
+  if (idA) {
+    const { data: objects } = await admin.storage.from('cashflow_docs').list(idA, { limit: 100 });
+    const paths = (objects ?? []).map((object) => `${idA}/${object.name}`);
+    if (paths.length) await admin.storage.from('cashflow_docs').remove(paths);
+  }
   section('Cleanup — borrar usuarios temporales (cascade)');
   for (const id of [idA, idB]) {
     if (!id) continue;

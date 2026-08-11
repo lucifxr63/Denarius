@@ -15,8 +15,8 @@ const schema = z.object({
 type FormValues = z.input<typeof schema>;
 
 const inputCls =
-  'h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition-colors focus:border-primary/60';
-const labelCls = 'mb-1.5 block text-xs font-medium text-muted-foreground';
+  'h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition-colors focus:border-primary/60 focus:ring-2 focus:ring-primary/20';
+const labelCls = 'mb-1.5 block text-sm font-medium text-foreground';
 
 interface Props {
   accounts: BankAccount[];

@@ -1,0 +1,4 @@
+import test from'node:test';import assert from'node:assert/strict';import fs from'node:fs';const source=fs.readFileSync(new URL('../launch/integration-test-beta-happy-flows.mjs',import.meta.url),'utf8');
+test('both buyer-persona flows traverse the financial control loop',()=>{assert.match(source,/pyme-tradicional/);assert.match(source,/startup-saas/);for(const step of['complete_financial_onboarding','alerts.read','close.complete','action.read','denarius_update_action_status'])assert.match(source,new RegExp(step))});
+test('happy flow certifies session recovery and invalid credentials',()=>{assert.match(source,/signOut/);assert.match(source,/getSession/);assert.match(source,/incorrecta/);assert.match(source,/get_active_denarius_tenant/)});
+test('happy-flow users are always removed',()=>{assert.match(source,/finally/);assert.match(source,/admin\.auth\.admin\.deleteUser/);assert.match(source,/cero huella/)});

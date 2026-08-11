@@ -6,11 +6,12 @@ import type { Invoice } from '@/lib/queries';
 interface Props {
   overdue: Invoice[];
   onResolve: (id: string, patch: { status?: 'PAID' | 'CANCELLED'; due_date?: string }) => Promise<void>;
+  canOperate?: boolean;
 }
 
 // A/R vencidas que NO entran a la proyección (modelo asimétrico). El usuario
 // las acciona: Pagado, Reprogramar (nueva fecha) o Incobrable.
-export function ResolutionCenter({ overdue, onResolve }: Props) {
+export function ResolutionCenter({ overdue, onResolve, canOperate=true }: Props) {
   if (overdue.length === 0) return null;
 
   return (
@@ -24,14 +25,14 @@ export function ResolutionCenter({ overdue, onResolve }: Props) {
       </p>
       <ul className="space-y-2">
         {overdue.map((inv) => (
-          <ResolutionRow key={inv.id} inv={inv} onResolve={onResolve} />
+          <ResolutionRow key={inv.id} inv={inv} onResolve={onResolve} canOperate={canOperate} />
         ))}
       </ul>
     </div>
   );
 }
 
-function ResolutionRow({ inv, onResolve }: { inv: Invoice; onResolve: Props['onResolve'] }) {
+function ResolutionRow({ inv, onResolve, canOperate }: { inv: Invoice; onResolve: Props['onResolve']; canOperate: boolean }) {
   const [busy, setBusy] = useState(false);
   const [reprogram, setReprogram] = useState(false);
   const [newDate, setNewDate] = useState(new Date().toISOString().slice(0, 10));
@@ -54,7 +55,7 @@ function ResolutionRow({ inv, onResolve }: { inv: Invoice; onResolve: Props['onR
           <p className="truncate text-sm font-medium">{inv.contact_name || 'Cliente sin nombre'}</p>
           <p className="text-xs text-muted-foreground">Venció el {inv.due_date} · {formatCLP(Number(inv.total_amount))}</p>
         </div>
-        <div className="flex items-center gap-2">
+        {canOperate ? <div className="flex items-center gap-2">
           <button className={`${btn} bg-primary/15 text-primary hover:bg-primary/25`} disabled={busy} onClick={() => act({ status: 'PAID' })}>
             <Check className="size-3.5" aria-hidden="true" /> Pagado
           </button>
@@ -64,7 +65,7 @@ function ResolutionRow({ inv, onResolve }: { inv: Invoice; onResolve: Props['onR
           <button className={`${btn} bg-danger/15 text-danger hover:bg-danger/25`} disabled={busy} onClick={() => act({ status: 'CANCELLED' })}>
             <XCircle className="size-3.5" aria-hidden="true" /> Incobrable
           </button>
-        </div>
+        </div> : <span className="rounded-full border border-border bg-muted px-2.5 py-1 text-xs text-muted-foreground">Solo lectura</span>}
       </div>
       {reprogram && (
         <div className="mt-3 flex items-center gap-2">

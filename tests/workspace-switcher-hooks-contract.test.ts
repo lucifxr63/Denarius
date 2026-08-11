@@ -1,0 +1,2 @@
+import assert from'node:assert/strict';import fs from'node:fs';import test from'node:test';const source=fs.readFileSync('src/components/layout/WorkspaceSwitcher.tsx','utf8');
+test('el permiso asincrono no cambia el orden de hooks',()=>{const permissionReturn=source.indexOf('if (!canChange) return'),escapeEffect=source.indexOf('// Cierra al hacer click fuera');assert.ok(permissionReturn>escapeEffect);assert.equal((source.slice(permissionReturn).match(/useEffect\s*\(/g)??[]).length,0)});

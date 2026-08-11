@@ -24,8 +24,8 @@ const schema = z
 type FormValues = z.input<typeof schema>;
 
 const inputCls =
-  'h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition-colors focus:border-primary/60';
-const labelCls = 'mb-1.5 block text-xs font-medium text-muted-foreground';
+  'h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition-colors focus:border-primary/60 focus:ring-2 focus:ring-primary/20';
+const labelCls = 'mb-1.5 block text-sm font-medium text-foreground';
 
 interface Props {
   onSubmit: (values: {
@@ -164,7 +164,20 @@ export function InvoiceForm({ onSubmit, onParse, pdfUsed, pdfLimit }: Props) {
           if (!parsing) void handleFile(e.dataTransfer.files?.[0]);
         }}
         aria-disabled={parsing}
-        className="mb-4 flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-accent/50 bg-accent/5 px-4 py-5 text-center transition-colors hover:border-accent cursor-pointer"
+        role="button"
+        tabIndex={parsing ? -1 : 0}
+        onKeyDown={(event) => {
+          if (!parsing && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault();
+            fileRef.current?.click();
+          }
+        }}
+        aria-label="Subir factura en PDF para prellenar el formulario"
+        className={`mb-4 flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed px-4 py-5 text-center transition-colors ${
+          parsing
+            ? 'cursor-not-allowed border-border bg-muted/30 opacity-60'
+            : 'cursor-pointer border-accent/50 bg-accent/5 hover:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60'
+        }`}
       >
         <input
           ref={fileRef}
@@ -209,7 +222,7 @@ export function InvoiceForm({ onSubmit, onParse, pdfUsed, pdfLimit }: Props) {
           <button
             type="button"
             onClick={() => { resetUpload(); fileRef.current?.click(); }}
-            className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted cursor-pointer"
+            className="mt-3 inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
           >
             <RotateCcw className="size-3.5" aria-hidden="true" />
             Subir otro documento

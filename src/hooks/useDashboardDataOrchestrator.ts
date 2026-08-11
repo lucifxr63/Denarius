@@ -79,6 +79,9 @@ function buildOptimisticTransaction(
     amount: input.amount,
     type: input.type,
     category: input.category ?? null,
+    import_batch_id: null,
+    import_fingerprint: null,
+    source_reference: null,
     transaction_date: input.transaction_date ?? ts.slice(0, 10),
     created_at: ts,
     updated_at: ts,
@@ -86,12 +89,12 @@ function buildOptimisticTransaction(
 }
 
 // ── Reconciliadores: traen la verdad del servidor a las colecciones afectadas ──
-async function reconcileInvoices(): Promise<void> {
-  useDashboardData.getState().hydrate({ invoices: await listInvoices() });
+async function reconcileInvoices(tenantId:string): Promise<void> {
+  useDashboardData.getState().hydrate({ invoices: await listInvoices(tenantId) });
 }
 // Una transacción dispara el trigger de saldo → re-fetch también de cuentas.
-async function reconcileTransactions(): Promise<void> {
-  const [transactions, accounts] = await Promise.all([listTransactions(), listAccounts()]);
+async function reconcileTransactions(tenantId:string): Promise<void> {
+  const [transactions, accounts] = await Promise.all([listTransactions(tenantId), listAccounts(tenantId)]);
   useDashboardData.getState().hydrate({ transactions, accounts });
 }
 
@@ -143,10 +146,10 @@ export function useDashboardDataOrchestrator(): DashboardOrchestrator {
         return;
       }
       const [accounts, invoices, transactions, recurring] = await Promise.all([
-        listAccounts(),
-        listInvoices(),
-        listTransactions(),
-        listRecurringTransactions(),
+        listAccounts(tenant.id),
+        listInvoices(tenant.id),
+        listTransactions(tenant.id),
+        listRecurringTransactions(tenant.id),
       ]);
       useDashboardData.getState().hydrate({ accounts, invoices, transactions, recurring });
       setLoading(false);
@@ -167,45 +170,53 @@ export function useDashboardDataOrchestrator(): DashboardOrchestrator {
     await mutate(
       () => useDashboardData.getState().upsertInvoice(buildOptimisticInvoice(input, tenantId, userId)),
       () => createInvoice({ ...input, tenant_id: tenantId }),
-      reconcileInvoices,
+      () => reconcileInvoices(tenantId),
       'No se pudo registrar la factura',
     );
   }, [userId]);
 
   const resolveInvoice = useCallback<DashboardOrchestrator['resolveInvoice']>(async (id, patch) => {
+    const { tenantId } = useDashboardData.getState();
+    if (!tenantId) throw new Error('Sin empresa activa');
     const current = useDashboardData.getState().invoices.find((i) => i.id === id);
     await mutate(
       () => { if (current) useDashboardData.getState().upsertInvoice({ ...current, ...patch }); },
       () => updateInvoice(id, patch),
-      reconcileInvoices,
+      () => reconcileInvoices(tenantId),
       'No se pudo actualizar la factura',
     );
   }, []);
 
   const removeInvoice = useCallback<DashboardOrchestrator['removeInvoice']>(async (id) => {
+    const { tenantId } = useDashboardData.getState();
+    if (!tenantId) throw new Error('Sin empresa activa');
     await mutate(
       () => useDashboardData.getState().removeInvoice(id),
       () => deleteInvoice(id),
-      reconcileInvoices,
+      () => reconcileInvoices(tenantId),
       'No se pudo eliminar la factura',
     );
   }, []);
 
   const addTransaction = useCallback<DashboardOrchestrator['addTransaction']>(async (input) => {
+    const { tenantId } = useDashboardData.getState();
+    if (!tenantId) throw new Error('Sin empresa activa');
     if (!userId) throw new Error('Sin sesión');
     await mutate(
       () => useDashboardData.getState().upsertTransaction(buildOptimisticTransaction(input, userId)),
       () => createTransaction({ ...input, owner_id: userId }),
-      reconcileTransactions,
+      () => reconcileTransactions(tenantId),
       'No se pudo registrar el movimiento',
     );
   }, [userId]);
 
   const removeTransaction = useCallback<DashboardOrchestrator['removeTransaction']>(async (id) => {
+    const { tenantId } = useDashboardData.getState();
+    if (!tenantId) throw new Error('Sin empresa activa');
     await mutate(
       () => useDashboardData.getState().removeTransaction(id),
       () => deleteTransaction(id),
-      reconcileTransactions,
+      () => reconcileTransactions(tenantId),
       'No se pudo eliminar el movimiento',
     );
   }, []);

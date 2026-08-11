@@ -1,0 +1,4 @@
+import assert from'node:assert/strict';import fs from'node:fs';import test from'node:test';const sql=fs.readFileSync('supabase/migrations/20260810150000_den117_weekly_action_outcome.sql','utf8'),page=fs.readFileSync('src/pages/WeeklyClose.tsx','utf8');
+test('el resultado evalua el plan previo cuando existen dos cierres',()=>{assert.match(sql,/case when close_count>=2 then 2 else 1 end/);assert.match(sql,/actual_cash_change/)});
+test('separacion entre impacto declarado y cambio real',()=>{assert.match(sql,/expected_cash_impact/);assert.match(sql,/snapshot#>>'\{core,current_cash\}'/);assert.match(page,/no demuestra que las acciones hayan causado el cambio/)});
+test('sin comparacion suficiente no inventa variacion',()=>{assert.match(sql,/else null end/);assert.match(page,/Requiere otro cierre/)});
